@@ -1,0 +1,51 @@
+# Local lab assets: keep folder markers, never the runtime contents.
+/ISO/*
+!/ISO/.gitkeep
+/vms/*
+!/vms/.gitkeep
+/logs/*
+!/logs/.gitkeep
+/private/*
+!/private/.gitkeep
+
+# VM media and state, including files accidentally placed elsewhere.
+*.[iI][sS][oO]
+*.vdi
+*.vmdk
+*.vhd
+*.vhdx
+*.vbox
+*.vbox-prev
+*.sav
+*.ova
+*.ovf
+Snapshots/
+
+# Secrets and cluster administrator credentials.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+certificates/
+.ssh/
+.kube/
+.olcne/
+admin.conf
+kubeconfig*
+*.log
+*.local.psd1
+
+# Local/editor noise.
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.tmp
+*.bak
+
+# Protected PowerShell credential exports, even if accidentally copied elsewhere.
+*.clixml

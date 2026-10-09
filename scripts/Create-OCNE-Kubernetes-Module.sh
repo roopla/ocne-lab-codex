@@ -1,0 +1,4 @@
+set -euo pipefail
+[[ $(hostname -s) == ocne-op && $(id -un) == labadmin ]]
+cd "$HOME"
+olcnectl module create --environment-name homelab --module kubernetes --name cluster1 --container-registry container-registry.oracle.com/olcne --control-plane-nodes ocne-cp.lab.test:8090 --worker-nodes ocne-w1.lab.test:8090,ocne-w2.lab.test:8090 --selinux enforcing --restrict-service-externalip-ca-cert "$HOME/certificates/restrict_external_ip/ca.cert" --restrict-service-externalip-tls-cert "$HOME/certificates/restrict_external_ip/node.cert" --restrict-service-externalip-tls-key "$HOME/certificates/restrict_external_ip/node.key"
