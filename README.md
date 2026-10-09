@@ -4,10 +4,53 @@ The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, i
 
 Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** Database Operator and RAC remain a separate, paused task.
 
+## Architecture at a glance
+
+```mermaid
+flowchart TB
+    subgraph HOST["WINDOWS 11 WORKSTATION · VirtualBox 7.2.18"]
+        direction TB
+        ACCESS["PowerShell + OpenSSH<br/>SSH aliases + pinned keys"]
+        subgraph NET["ocne19-net · 192.168.77.0/24 · DHCP off · gateway .1"]
+            direction TB
+            OP["ocne-op<br/>OCNE operator + NFS<br/>192.168.77.10<br/>4 GiB RAM · 2 vCPUs"]
+            subgraph K8S["KUBERNETES CLUSTER · homelab / cluster1"]
+                direction TB
+                CP["ocne-cp<br/>Control plane<br/>192.168.77.11<br/>8 GiB RAM · 4 vCPUs"]
+                W1["ocne-w1 · Worker 1<br/>192.168.77.12<br/>22 GiB RAM · 6 vCPUs"]
+                W2["ocne-w2 · Worker 2<br/>192.168.77.13<br/>22 GiB RAM · 6 vCPUs"]
+                CP --> W1
+                CP --> W2
+            end
+            OP -.->|"OCNE management"| K8S
+        end
+        ACCESS -->|"Loopback SSH forwards · 2220–2223 to guest port 22"| NET
+        GOLDEN["ol9-golden<br/>Preserved · powered off<br/>Original snapshot chain"]
+    end
+    classDef host fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef operator fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:2px
+    classDef control fill:#eff6ff,stroke:#2563eb,color:#1e3a8a,stroke-width:2px
+    classDef worker fill:#ecfdf5,stroke:#059669,color:#064e3b,stroke-width:2px
+    classDef preserved fill:#f8fafc,stroke:#94a3b8,color:#475569,stroke-dasharray:5 5
+    class ACCESS host
+    class OP operator
+    class CP control
+    class W1,W2 worker
+    class GOLDEN preserved
+    style HOST fill:#ffffff,stroke:#94a3b8
+    style NET fill:#f8fafc,stroke:#64748b
+    style K8S fill:#ffffff,stroke:#2563eb
+```
+
+Blue is the control plane; green marks the two workers; orange is the OCNE operator/NFS server. Arrows show logical management relationships, not a complete firewall or traffic map. The operator is a separate VM outside Kubernetes. The golden VM is retained as the original source.
+
+See [Architecture and data paths](docs/ARCHITECTURE.md) for SSH forwarding, storage layout and operating boundaries. These diagrams show the recorded OCNE foundation; Database Operator and RAC are not deployed.
+
 ## Documentation map
 
 | Document | Use |
 |---|---|
+| [Architecture and data paths](docs/ARCHITECTURE.md) | Visual VM topology, SSH forwarding and storage |
 | [Operating the lab](docs/OPERATING-LAB.md) | Access, startup, shutdown, health checks, storage and credential locations |
 | [SSH access](docs/SSH-ACCESS.md) | Windows hosts, NAT forwarding, guest mesh and pinned keys |
 | [Cloning entry point](README-CLONING.md) | Build sequence and the actual source adaptations |
