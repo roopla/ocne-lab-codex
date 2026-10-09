@@ -109,3 +109,7 @@ The documentation task is complete. This revision made documentation/tooling cha
 ## GitHub publication preparation — 2026-10-08
 
 User authorized pushing to https://github.com/roopla/ocne-lab-codex.git. Initialized the local Git repository on main and configured that URL as origin. Remote reference inspection returned no existing refs. Confirmed ignore rules exclude actual workstation keys, encrypted credentials, VM disks, ISO media and logs; added an extension rule for protected PowerShell credential exports outside private/. Reviewing an explicit allowlist of documentation, configuration, helper scripts and empty folder markers before the initial commit. Push success is not yet claimed at this entry.
+
+## GitHub publication verified — 2026-10-08
+
+Pushed initial commit 1186940765d3bd2ddb49fd30ed06eef13f9f7530 to the user-authorized repository https://github.com/roopla/ocne-lab-codex.git, branch main. A separate git ls-remote check confirmed remote main matched the local commit. The initial commit contains 94 reviewed files (documentation, non-secret configuration, helpers and empty folder markers). VM disks, ISO/preparation media, raw logs, protected credentials and private keys were excluded. Staged allowlist/credential-pattern checks and git diff --cached --check passed; the documentation consistency check passed. The local main branch tracks origin/main. This follow-up entry records the verified initial publication; no VM or cluster operations were performed.
