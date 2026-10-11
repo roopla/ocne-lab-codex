@@ -1,6 +1,6 @@
 # RAC readiness and media inventory
 
-Status on 10 October 2026: host/cluster prerequisites are configured and the gold-home manifest passed server-side dry-run. RAC is not provisioned. CVU container-host validation passed on both workers. User-supplied slim image and patched home ZIPs and their acceptance checks remain outstanding. See the [manual Bash guide](RAC-PREREQUISITES-GUIDE.md), [user handoff](RAC-PROVISIONING-HANDOFF.md), and [cloning run log](CLONING-RUN-LOG.md).
+Status on 10 October 2026: host/cluster prerequisites are configured and the gold-home manifest passed server-side dry-run. RAC is not provisioned. CVU container-host validation passed on both workers. The supplied OL9 slim image and both 19.32 home ZIPs are now verified and staged on both workers. DBCA fix 34436514 applicability remains unresolved; see [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). See the [manual Bash guide](RAC-PREREQUISITES-GUIDE.md), [user handoff](RAC-PROVISIONING-HANDOFF.md), and [cloning run log](CLONING-RUN-LOG.md).
 
 ## Verified installation media
 
@@ -63,4 +63,4 @@ Patch-specific version requirements above come from the locally downloaded Oracl
 
 Network tests passed in both directions on both private networks, plus Kubernetes DNS. The guest NICs require persistent promiscuous reception in addition to VirtualBox allow-vms policy. Latest full acceptance and reboot results are chronological in the run log.
 
-Cert-manager v1.17.4 is installed; its three deployments and the Database Operator were Ready. Required secrets and worker labels exist. No RacDatabase/PV/PVC has been created for the database. The previous verified base/RU media are preserved but will not be used by the user's gold-home workflow. Empty gold-home stage directories are prepared on both workers.
+Cert-manager v1.17.4 is installed; its three deployments and the Database Operator were Ready. Required secrets and worker labels exist. No RacDatabase/PV/PVC has been created for the database. The previous verified base/RU media are preserved but will not be used by the user's gold-home workflow. Both gold-home stage directories now contain the verified user ZIPs, with Oracle ownership and container_file_t labels.

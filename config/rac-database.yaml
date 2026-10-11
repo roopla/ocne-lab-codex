@@ -1,5 +1,5 @@
 # USER-APPLIED ONLY. This file has not been applied to the cluster.
-# Supply your OL9 RAC slim image and fully patched 19.32 gold home ZIPs first.
+# Verified OL9 slim image and user-provided 19.32 gold ZIPs are staged on both workers.
 # No RU, OPatch, or one-off patch application is configured during provisioning.
 apiVersion: database.oracle.com/v4
 kind: RacDatabase
@@ -20,8 +20,8 @@ spec:
         interface: ens2
     workerNodeSelector:
       raccluster: raccluster01
-  # Replace with your actual image reference; this placeholder cannot be pulled.
-  image: example.invalid/ocne/rac-slim:19.32-ol9
+  # Immutable digest verified in CRI-O on both workers.
+  image: docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d
   imagePullPolicy: IfNotPresent
   # For a private registry, create the registry secret and set imagePullSecret.
   sshKeySecret:
@@ -80,8 +80,8 @@ spec:
     dbBase: /u01/app/oracle
     inventory: /u01/app/oraInventory
     # Expected filenames; update these if your supplied ZIPs use other names.
-    gridSwZipFile: gi-home-19.32-gold.zip
-    dbSwZipFile: db-home-19.32-gold.zip
+    gridSwZipFile: oracle-gridhome-19.32.zip
+    dbSwZipFile: oracle-dbhome-19.32.zip
     hostSwStageLocation: /scratch/software/stage/19c/19.32-gold
     sgaSize: 1G
     pgaSize: 2G

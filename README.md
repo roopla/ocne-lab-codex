@@ -2,7 +2,7 @@
 
 The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, including an ordered power cycle. The subsequent OCNE report completed at 22:10. This documentation was reconciled with those results on 8 October; that is a documentation review date, not a new live health check.
 
-Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** RAC infrastructure and operator prerequisites were prepared on 9-10 October after recovering the foundation from host Modern Standby interruptions. RAC has not been provisioned. Start with the [RAC handoff](docs/RAC-PROVISIONING-HANDOFF.md), [provisioning YAML](config/rac-database.yaml), and [readiness evidence](docs/RAC-READINESS.md). The user will supply the slim image and fully patched gold homes and will apply the RAC manifest themselves.
+Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** RAC infrastructure and operator prerequisites were prepared on 9-10 October after recovering the foundation from host Modern Standby interruptions. RAC has not been provisioned. Start with the [RAC handoff](docs/RAC-PROVISIONING-HANDOFF.md), [provisioning YAML](config/rac-database.yaml), and [readiness evidence](docs/RAC-READINESS.md). The supplied slim image and 19.32 gold homes are now verified and staged on both workers; see [artifact acceptance](docs/RAC-ARTIFACT-ACCEPTANCE.md) for the remaining DBCA fix applicability check. The user will apply the RAC manifest themselves.
 
 ## Architecture at a glance
 
@@ -44,7 +44,7 @@ flowchart TB
 
 Blue is the control plane; green marks the two workers; orange is the OCNE operator/NFS server. Arrows show logical management relationships, not a complete firewall or traffic map. The operator is a separate VM outside Kubernetes. The golden VM is retained as the original source.
 
-See [Architecture and data paths](docs/ARCHITECTURE.md) for SSH forwarding, storage layout and operating boundaries. These diagrams show the recorded OCNE foundation; Database Operator and RAC are not deployed.
+See [Architecture and data paths](docs/ARCHITECTURE.md) for SSH forwarding, storage layout and operating boundaries. These diagrams show the OCNE foundation and installed RAC prerequisites. Database Operator is installed; RAC remains unprovisioned.
 
 ## Documentation map
 
@@ -91,7 +91,7 @@ The Windows host reports 28 logical processors and 61.66 GiB visible physical RA
 
 All new lab VM disks are under this project. VirtualBox global registration and the existing golden VM retain their original Windows locations. Linux state, platform certificates and the Kubernetes administrator kubeconfig reside inside guests.
 
-The operator's separate 100 GiB NFS filesystem is mounted at `/srv/nfs`, exporting `/srv/nfs/share`. Clients mount `/mnt/ocne-share`; `labadmin` UID/GID 1001 has read/write access. Root squashing and SELinux remain enabled. No Kubernetes PV/PVC, provisioner, ASM storage, Database Operator or RAC deployment was added.
+The operator's separate 100 GiB NFS filesystem is mounted at `/srv/nfs`, exporting `/srv/nfs/share`. Clients mount `/mnt/ocne-share`; `labadmin` UID/GID 1001 has read/write access. Root squashing and SELinux remain enabled. No Kubernetes NFS PV/PVC or provisioner was added. Subsequent RAC preparation added shared ASM partitions and Database Operator; RAC itself remains unprovisioned.
 
 ## Build and maintenance boundaries
 

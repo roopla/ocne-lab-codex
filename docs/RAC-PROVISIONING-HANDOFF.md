@@ -1,28 +1,28 @@
 # RAC provisioning handoff
 
-RAC has **not** been provisioned. The operator's server-side create dry-run accepted [config/rac-database.yaml](../config/rac-database.yaml), and no RacDatabase resource exists. The manifest is for the user to apply after completing the artifact gates below. A successful dry-run validates API/admission rules, not image availability, gold-home contents or a working database.
+RAC has **not** been provisioned. The operator's server-side create dry-run accepted [config/rac-database.yaml](../config/rac-database.yaml), and no RacDatabase resource exists. The manifest is for the user to apply after resolving the remaining patch-applicability check below. A successful dry-run validates API/admission rules, not image availability, gold-home contents or a working database.
 
 For a manual rebuild, follow [the prerequisite guide](RAC-PREREQUISITES-GUIDE.md), including its direct Bash command appendix. Actual results are in [the run log](CLONING-RUN-LOG.md) and [readiness inventory](RAC-READINESS.md).
 
 ## Prepared infrastructure
 
-- Two22GiB/6 CPU workers, each with 128GiB scratch and its existing100GiB container disk.
-- Two shared50GiB ASM partitions, identified by persistent labels; unformatted and unused by ASM.
+- Two 22 GiB/6 CPU workers, each with 128GiB scratch and its existing 100 GiB container disk.
+- Two shared 50 GiB ASM partitions, identified by persistent labels; unformatted and unused by ASM.
 - Two tested private macvlan interconnects, OCNE Multus, worker labels, and mounted host NFS.
-- Kernel settings,2 GiB HugePages per worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
+- Kernel settings, 2 GiB HugePages per worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
 - Cert-manager1.17.4, Database Operator 2.2.0, required RBAC and Ready operator certificates.
 - Protected database-password and RAC SSH secrets.
 
 Cert-manager1.17.4 is outside community maintenance, chosen for this fixed Kubernetes 1.29 lab. The small worker sizing has not been validated by provisioning RAC. The final acceptance entry in the run log records persistence/network/NFS checks separately.
 
-## 1. Supply and verify the image
+## 1. Verified image staged on both workers
 
-The user is building the slim image and will pre-pull it on both workers. It must be an OL9 image compatible with the 2.2.0 RAC controller, its startup scripts, paths, secret format and the supplied19.32 homes. Replace `example.invalid/ocne/rac-slim:19.32-ol9` in the YAML with the **exact same fully qualified image reference** present on both workers, preferably an immutable digest. The placeholder is deliberately not deployable.
+The supplied `roopla/oracle-rac:19.3.0-slim` was pulled into rootful CRI-O on both workers on 10 October. Both report the same immutable digest, now pinned in the YAML. Image inspection found OL9.8, linux/amd64, expected Oracle IDs, systemd and the controller scripts; all 19 top-level Python scripts parsed. No image entrypoint or installer was executed. See [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md) for exact evidence and limits.
 
 Run these commands on **each worker**, substituting the actual image reference:
 
 ```bash
-RAC_IMAGE='registry.example.com/your-project/rac-slim:19.32-ol9'
+RAC_IMAGE='docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d'
 # Authenticate interactively first if your registry requires it; never put passwords in arguments.
 sudo crictl pull "$RAC_IMAGE"
 sudo crictl images
@@ -31,32 +31,32 @@ sudo crictl inspecti "$RAC_IMAGE"
 
 Use the configured CRI-O endpoint; inspect /etc/crictl.yaml if required. A rootless Podman pull uses a different image store. Do not assume podman images proves CRI-O availability; verify with crictl. Record matching image IDs/digests and inspect the built image's OS, scripts and user/group mapping. `imagePullPolicy: IfNotPresent` uses the local image if available. If later using registry authentication from Kubernetes, create a protected imagePullSecret in rac and set spec.imagePullSecret; do not commit its data.
 
-## 2. Stage fully patched gold homes
+## 2. Verified gold homes staged on both workers
 
 Expected paths on **both workers**:
 
 ```text
-/scratch/software/stage/19c/19.32-gold/gi-home-19.32-gold.zip
-/scratch/software/stage/19c/19.32-gold/db-home-19.32-gold.zip
+/scratch/software/stage/19c/19.32-gold/oracle-gridhome-19.32.zip
+/scratch/software/stage/19c/19.32-gold/oracle-dbhome-19.32.zip
 ```
 
-Use those filenames or update configParams.gridSwZipFile/dbSwZipFile consistently. The directories already exist, labeled container_file_t and owned by labadmin for transfer. The user will supply the actual archives; they are not the previously checked base19.3 ZIPs. Existing base/RU files in the separate19.32 directory are preserved and unused by this YAML.
+These exact files are staged on both workers and referenced by configParams.gridSwZipFile/dbSwZipFile. Full source CRC/path checks and all four destination SHA256 comparisons passed. Files are owned by 54321:54321, mode 0755, labeled container_file_t. Each worker retains about 101 GiB free scratch space. Existing base/RU files in the separate 19.32 directory are preserved and unused. The following commands reproduce the transfer on a new build; do not overwrite an existing staged file without first checking its hash.
 
 Windows PowerShell:
 
 ```powershell
-Get-FileHash .\ISO\gi-home-19.32-gold.zip -Algorithm SHA256
-Get-FileHash .\ISO\db-home-19.32-gold.zip -Algorithm SHA256
-scp .\ISO\gi-home-19.32-gold.zip .\ISO\db-home-19.32-gold.zip ocne-w1:/scratch/software/stage/19c/19.32-gold/
-scp .\ISO\gi-home-19.32-gold.zip .\ISO\db-home-19.32-gold.zip ocne-w2:/scratch/software/stage/19c/19.32-gold/
+Get-FileHash .\ISO\oracle-gridhome-19.32.zip -Algorithm SHA256
+Get-FileHash .\ISO\oracle-dbhome-19.32.zip -Algorithm SHA256
+scp .\ISO\oracle-gridhome-19.32.zip .\ISO\oracle-dbhome-19.32.zip ocne-w1:/scratch/software/stage/19c/19.32-gold/
+scp .\ISO\oracle-gridhome-19.32.zip .\ISO\oracle-dbhome-19.32.zip ocne-w2:/scratch/software/stage/19c/19.32-gold/
 ```
 
 Equivalent Bash from the project root in Git Bash or another workstation with the configured SSH aliases:
 
 ```bash
-sha256sum ISO/gi-home-19.32-gold.zip ISO/db-home-19.32-gold.zip
-scp ISO/gi-home-19.32-gold.zip ISO/db-home-19.32-gold.zip ocne-w1:/scratch/software/stage/19c/19.32-gold/
-scp ISO/gi-home-19.32-gold.zip ISO/db-home-19.32-gold.zip ocne-w2:/scratch/software/stage/19c/19.32-gold/
+sha256sum ISO/oracle-gridhome-19.32.zip ISO/oracle-dbhome-19.32.zip
+scp ISO/oracle-gridhome-19.32.zip ISO/oracle-dbhome-19.32.zip ocne-w1:/scratch/software/stage/19c/19.32-gold/
+scp ISO/oracle-gridhome-19.32.zip ISO/oracle-dbhome-19.32.zip ocne-w2:/scratch/software/stage/19c/19.32-gold/
 ```
 
 On each worker, verify the mounted scratch UUID against this build's inventory, then:
@@ -64,18 +64,18 @@ On each worker, verify the mounted scratch UUID against this build's inventory, 
 ```bash
 findmnt -M /scratch -o SOURCE,UUID,FSTYPE,TARGET
 cd /scratch/software/stage/19c/19.32-gold
-sha256sum gi-home-19.32-gold.zip db-home-19.32-gold.zip
-unzip -tq gi-home-19.32-gold.zip
-unzip -tq db-home-19.32-gold.zip
-unzip -Z1 gi-home-19.32-gold.zip | head
-unzip -Z1 db-home-19.32-gold.zip | head
-sudo chmod 0755 gi-home-19.32-gold.zip db-home-19.32-gold.zip
-sudo chown 54321:54321 gi-home-19.32-gold.zip db-home-19.32-gold.zip
+sha256sum oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+unzip -tq oracle-gridhome-19.32.zip
+unzip -tq oracle-dbhome-19.32.zip
+unzip -Z1 oracle-gridhome-19.32.zip | head
+unzip -Z1 oracle-dbhome-19.32.zip | head
+sudo chmod 0755 oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+sudo chown 54321:54321 oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
 sudo restorecon -RF /scratch/software/stage/19c/19.32-gold
-ls -lZ gi-home-19.32-gold.zip db-home-19.32-gold.zip
+ls -lZ oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
 ```
 
-Compare hashes to the originals on Windows and to each other. Confirm the archives are valid home images with installer contents at the archive root, no unsafe paths, and the desired19.32 inventory. Preserve sanitized build/OPatch inventory evidence from the source homes. Resolve release-specific recommended fix applicability during gold-image creation, including the DBCA memory fix discussed in Oracle's guide. Do not infer patch inclusion from the filename or blindly apply19.28 one-offs to19.32.
+The verified hashes, root installers, expanded sizes and archived 19.32 patch inventory are recorded in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). Archived OPatch is 12.2.0.1.53. **Remaining check:** DBCA fix 34436514 is absent from the archived patch/bug inventories. Confirm with build evidence or Oracle Support whether it is included by another route, superseded or required for 19.32 before provisioning. Do not apply the guide's 19.28 one-off blindly. Archive metadata is not a live OPatch inventory or runtime database test.
 
 The YAML intentionally omits ruPatchLocation, oPatchLocation, oPatchSwZipFile, oneOffLocation and gridOneOffIds. Provisioning must use the already-patched homes, with no deployment-time patch step configured.
 
