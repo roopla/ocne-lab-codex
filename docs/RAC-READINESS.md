@@ -1,6 +1,6 @@
 # RAC readiness and media inventory
 
-Status on 10 October 2026: host/cluster prerequisites are configured and the gold-home manifest passed server-side dry-run. RAC is not provisioned. CVU container-host validation passed on both workers. The supplied OL9 slim image and both 19.32 home ZIPs are now verified and staged on both workers. DBCA fix 34436514 applicability remains unresolved; see [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). See the [manual Bash guide](RAC-PREREQUISITES-GUIDE.md), [user handoff](RAC-PROVISIONING-HANDOFF.md), and [cloning run log](CLONING-RUN-LOG.md).
+Status on 10 October 2026: host/cluster prerequisites are configured and the gold-home manifest passed server-side dry-run. RAC is not provisioned. CVU container-host validation passed on both workers. The supplied OL9 slim image and both 19.32 home ZIPs are now verified and staged on both workers. The user confirmed DBCA fix 34436514 is unnecessary for the supplied 19.32 home; the prerequisite check is closed; see [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). See the [manual Bash guide](RAC-PREREQUISITES-GUIDE.md), [user handoff](RAC-PROVISIONING-HANDOFF.md), and [cloning run log](CLONING-RUN-LOG.md).
 
 ## Verified installation media
 
@@ -16,7 +16,7 @@ The files are under `D:\OCNE19-Lab\ISO`. Archive members were inspected without 
 
 Both local RU README.html files require OPatch 12.2.0.1.52 or later. The downloaded OPatch version satisfies that requirement. The GI RU includes Database RU 39472050; the separate DB RU archive is not an additional, different database update.
 
-Oracle's RAC example describes release-specific one-offs for 19.28. The local 19.32 OCW inventory lists fixes 37531398 and 37805442, the components of example merge 38336965. The DB RU inventory does not list 34436514. This metadata check does not determine whether a separate 19.32-compatible DBCA fix is needed. Resolve applicability and conflicts before patch execution; never install a 19.28 one-off blindly on 19.32.
+Oracle's RAC example describes release-specific one-offs for 19.28. The local 19.32 OCW inventory lists fixes 37531398 and 37805442, the components of example merge 38336965. The DB RU inventory does not list 34436514. This metadata check does not determine whether a separate 19.32-compatible DBCA fix is needed. On 10 October the user confirmed that fix 34436514 is unnecessary for this supplied home. This closes the lab prerequisite question based on the owner's confirmation; it is not an independent Oracle Support determination. No additional patch is configured.
 
 Reproduce local archive checks with [Inspect-RAC-Media.py](../scripts/Inspect-RAC-Media.py). It writes `logs/rac-media-inventory.json`; it neither extracts nor executes archive contents. Full checks read all downloaded ZIP data and may take several minutes.
 

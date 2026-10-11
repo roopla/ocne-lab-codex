@@ -1,6 +1,6 @@
 # Manual RAC prerequisite setup on the OCNE 1.9 cloning lab
 
-This guide records the local Windows/VirtualBox implementation and the Oracle Linux/Kubernetes prerequisites used on 9-10 October 2026. It stops before RAC provisioning. The user supplied an OL9 RAC slim image and 19.32 GI/database gold home ZIPs; these are verified and staged on both workers. The user will apply the database manifest themselves after resolving the remaining patch-applicability check in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
+This guide records the local Windows/VirtualBox implementation and the Oracle Linux/Kubernetes prerequisites used on 9-10 October 2026. It stops before RAC provisioning. The user supplied an OL9 RAC slim image and 19.32 GI/database gold home ZIPs; these are verified and staged on both workers. The user will apply the database manifest themselves; [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md) records completed checks and their confirmation that DBCA fix 34436514 is unnecessary for this home.
 
 For the complete foundation, first follow [golden VM cloning](OCNE-1.9-Golden-VM-Cloning-Guide.md) and the full [OCNE installation guide](OCNE-1.9-OL9-Setup-Guide.md). Do not substitute Quick Install, olcnectl provision, standalone kubeadm, OCNE2, or fresh ISO scripts02/03. [The run log](CLONING-RUN-LOG.md) records what actually ran; commands below are instructions for a future build, not assertions they have all run again.
 
@@ -172,7 +172,7 @@ Label only the two worker nodes with `raccluster=raccluster01`; retain existing 
 
 Continue with [RAC-PROVISIONING-HANDOFF.md](RAC-PROVISIONING-HANDOFF.md) for artifact names, staging commands, CVU gate, dry-run validation, user-only apply and post-deployment checks. The YAML has no deployment-time RU/OPatch fields. Do not run the historical RU extraction helpers when following the gold-home route.
 
-The supplied image and gold ZIPs passed the staging checks in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). CVU container-host validation also passed on both workers; see [the results and commands](RAC-CVU-RESULTS.md). Resolve the documented DBCA fix applicability question before the user's provisioning step.
+The supplied image and gold ZIPs passed the staging checks in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). CVU container-host validation also passed on both workers; see [the results and commands](RAC-CVU-RESULTS.md). The DBCA fix applicability question is closed by the user's confirmation; provisioning and runtime acceptance remain the user's next steps.
 
 ## Sources and attribution
 

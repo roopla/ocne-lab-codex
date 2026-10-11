@@ -131,3 +131,7 @@ Final 21:46 EDT cluster check passed: all three nodes, all eight deployments and
 ## RAC manifest provenance documented - 2026-10-10 21:51 EDT
 
 At the user's request, added the exact pinned Oracle 2.2.0 racdb_prov.yaml source, linked API/admission/controller references, and a sample-versus-lab adaptation table to docs/RAC-PROVISIONING-HANDOFF.md. Recorded the image, gold-home, storage, network, secret, resource and database choices, plus prior validation and its limits. This update changes documentation only; the manifest and live cluster were not changed or applied.
+
+## DBCA prerequisite decision - 2026-10-10 21:56 EDT
+
+The user confirmed that DBCA fix 34436514 is unnecessary for the supplied 19.32 home. Closed the remaining prerequisite question based on that owner confirmation, without claiming independently verified Oracle Support applicability or binary supersedence. Updated current readiness, artifact acceptance and handoff documentation; historical entries above retain the earlier unresolved state. No patch was applied, no manifest or artifact changed, and no RAC provisioning was performed. The user retains the provisioning step following their YAML review.

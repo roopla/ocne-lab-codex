@@ -1,6 +1,6 @@
 # RAC image and gold-home acceptance — 10 October 2026
 
-The supplied artifacts are staged on both workers. The final [RAC YAML](../config/rac-database.yaml) passed server-side create dry-run at 21:39 EDT. RAC has not been provisioned; no RacDatabase, PV or rac PVC exists. **One pre-deployment check remains: DBCA fix 34436514 applicability for the supplied 19.32 home.**
+The supplied artifacts are staged on both workers. The final [RAC YAML](../config/rac-database.yaml) passed server-side create dry-run at 21:39 EDT. RAC has not been provisioned; no RacDatabase, PV or rac PVC exists. **Prerequisite checks are complete: the user confirmed at 21:56 EDT that DBCA fix 34436514 is unnecessary for the supplied 19.32 home.**
 
 ## Image
 
@@ -32,9 +32,9 @@ Archive inventory records: DB RU 39472050 (19.32.0.0.260721), OCW 39526364 and O
 
 Both workers contain the files under `/scratch/software/stage/19c/19.32-gold`, owner 54321:54321, mode 0755 and SELinux container_file_t. Scratch mount UUIDs were checked before accepting files. Approximately 101 GiB remains free on each scratch filesystem; the two archives expand to about 21.7 GiB combined. Container filesystems retain about 97 GiB free. No homes were extracted or configured.
 
-## Remaining patch question
+## DBCA applicability decision - closed by user confirmation
 
-[Oracle's RAC on OCNE guide](https://docs.oracle.com/en/database/oracle/oracle-database/19/rackb/install-configure-rac-olcne.html) specifies DBCA memory fix 34436514 for its 19.28 example. None of the supplied archived patch/bug inventories lists that ID. This does not establish whether 19.32 supersedes it or whether another build step supplied the fix. Obtain sanitized source-home build/OPatch evidence or Oracle Support confirmation of applicability before applying the manifest. If a rebuilt home is required, rebuild it outside this deployment workflow, then repeat CRC/hash/staging checks and update the recorded fingerprints. No deployment-time patch application is configured.
+[Oracle's RAC on OCNE guide](https://docs.oracle.com/en/database/oracle/oracle-database/19/rackb/install-configure-rac-olcne.html) specifies DBCA memory fix 34436514 for its 19.28 example. None of the supplied archived patch/bug inventories lists that ID. This does not establish whether 19.32 supersedes it or whether another build step supplied the fix. On 10 October at 21:56 EDT, the user confirmed that fix 34436514 is unnecessary for the supplied 19.32 home. The prerequisite question is closed on that basis. This records the owner's determination; no independent Oracle Support verification or claim of binary inclusion/supersedence is made. The existing verified artifacts and manifest are retained. No deployment-time patch application is configured.
 
 ## Manual reproduction
 

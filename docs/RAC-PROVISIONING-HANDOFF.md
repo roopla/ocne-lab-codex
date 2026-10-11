@@ -1,6 +1,6 @@
 # RAC provisioning handoff
 
-RAC has **not** been provisioned. The operator's server-side create dry-run accepted [config/rac-database.yaml](../config/rac-database.yaml), and no RacDatabase resource exists. The manifest is for the user to apply after resolving the remaining patch-applicability check below. A successful dry-run validates API/admission rules, not image availability, gold-home contents or a working database.
+RAC has **not** been provisioned. The operator's server-side create dry-run accepted [config/rac-database.yaml](../config/rac-database.yaml), and no RacDatabase resource exists. Prerequisite preparation is complete, including the user's confirmation that DBCA fix 34436514 is unnecessary for the supplied home. The manifest is ready for the user's final review and application. A successful dry-run validates API/admission rules, not image availability, gold-home contents or a working database.
 
 For a manual rebuild, follow [the prerequisite guide](RAC-PREREQUISITES-GUIDE.md), including its direct Bash command appendix. Actual results are in [the run log](CLONING-RUN-LOG.md) and [readiness inventory](RAC-READINESS.md).
 
@@ -25,7 +25,7 @@ The sample provides the two-node structure, Oracle home paths, private-network r
 
 The added fields were checked against the pinned [RacDatabase API types](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_types.go), [admission validation](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_webhook.go), and [pod construction code](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/commons/crs/rac/racprovcluster.go). In particular, the operator requires at least 16 GiB ordinary memory; HugePages are additional. These resource choices are lab sizing, not Oracle-validated RAC capacity. Prerequisite-ignore and webhook development-mode flags are not enabled.
 
-Validation already performed: YAML parsing, image/ZIP staging checks, exact Windows/control-plane manifest SHA256 match, and successful server-side create dry-run on 10 October at 21:39 EDT. The resource has **not been applied**. API acceptance does not prove database runtime behavior; the remaining DBCA fix applicability question and post-provisioning checks are documented below and in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
+Validation already performed: YAML parsing, image/ZIP staging checks, exact Windows/control-plane manifest SHA256 match, and successful server-side create dry-run on 10 October at 21:39 EDT. The resource has **not been applied**. API acceptance does not prove database runtime behavior; the user-confirmed DBCA fix decision and post-provisioning checks are documented below and in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
 
 ## Prepared infrastructure
 
@@ -98,7 +98,7 @@ sudo restorecon -RF /scratch/software/stage/19c/19.32-gold
 ls -lZ oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
 ```
 
-The verified hashes, root installers, expanded sizes and archived 19.32 patch inventory are recorded in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). Archived OPatch is 12.2.0.1.53. **Remaining check:** DBCA fix 34436514 is absent from the archived patch/bug inventories. Confirm with build evidence or Oracle Support whether it is included by another route, superseded or required for 19.32 before provisioning. Do not apply the guide's 19.28 one-off blindly. Archive metadata is not a live OPatch inventory or runtime database test.
+The verified hashes, root installers, expanded sizes and archived 19.32 patch inventory are recorded in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). Archived OPatch is 12.2.0.1.53. **Check closed on 10 October:** the user confirmed that DBCA fix 34436514 is unnecessary for this supplied 19.32 home. Its ID was absent from the archived inventories; the closure records the owner's applicability decision, not independently verified supersedence or an Oracle Support finding. No extra patch will be applied. Archive metadata is not a live OPatch inventory or runtime database test.
 
 The YAML intentionally omits ruPatchLocation, oPatchLocation, oPatchSwZipFile, oneOffLocation and gridOneOffIds. Provisioning must use the already-patched homes, with no deployment-time patch step configured.
 
