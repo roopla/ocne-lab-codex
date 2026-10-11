@@ -87,3 +87,42 @@ The SSH wrapper runs bash -n before the guest payload. Parsing establishes synta
 The wrapper depends on PuTTY plink, private/ssh-endpoints.json, the selected DPAPI credential file, and access to private/ and logs/. Temporary credentials are removed in its finally block; inspect for remnants if execution is interrupted. Do not print credential-file contents or put passwords in command arguments/chat. Interactive sudo remains available through normal SSH sessions.
 
 The all-pods-ready check is scoped to the original base lab and will need review when workloads introduce completed Jobs or topology changes. Source procedure and observed acceptance are in the guides and run logs.
+
+## RAC preflight and time recovery checks
+
+- `Inspect-RAC-Media.py`: inspects all ZIP archives in ISO/, calculates SHA256 and checks every member CRC; writes only the report under logs/. No extraction or installer execution.
+- `Inspect-RAC-Readiness.sh`: root diagnostics on identified lab clones. Reports time, services, journal warnings, filesystem mounts and memory; individual diagnostic failures do not make its completion a health assertion.
+- `Verify-Recovery-Time.sh`: root, read-only acceptance for Chrony offset below 100 ms, no failed units, SELinux Enforcing, and no matching current-boot kernel stall/OOM messages. Does not reset failed units or repair time. Repeat after an observation interval to detect recurrence.
+
+These checks complement the existing storage, NFS, SSH and Kubernetes verification; they do not establish RAC capacity or long-term stability. See [RAC readiness](RAC-READINESS.md).
+
+## RAC preparation helpers
+
+Use [the manual guide and Bash appendix](RAC-PREREQUISITES-GUIDE.md) for the ordered workflow and direct Linux commands. [The handoff](RAC-PROVISIONING-HANDOFF.md) stops at user-only database provisioning.
+
+| Helper | Purpose and execution boundary |
+|---|---|
+| 08-Prepare-RAC-Hardware.ps1 | One-time Windows hardware creation; default inspection, -Apply requires exact worker identities and both powered off; never format guests |
+| Inspect-RAC-Storage.sh | Root storage inventory before initialization |
+| Prepare-RAC-Scratch.sh | One-time new scratch formatting; exact serial/machine-ID/blankness guards |
+| Verify-RAC-Disk-Signatures.sh | Historical pre-partition signature check; no longer applicable to GPT ASM disks |
+| Prepare-RAC-ASM-Partitions.sh | One-time GPT partitions on exact new shared disks; worker1 only; no filesystem |
+| Verify-RAC-Shared-Disks.sh | Exact pre-RAC partition identities and blank signatures; includes partprobe/udevadm, not strictly read-only |
+| Configure-RAC-Private-NICs.sh | One-time worker NM profiles using observed MACs |
+| Enable-RAC-Private-Promiscuous.sh | Persistent/runtime reception fix on dedicated private profiles only |
+| Install-RAC-Multus.sh | OCNE1.9 module create/install on operator, refuses existing module |
+| Configure-RAC-Multus-Networks.sh | Reviewed namespace/NAD apply on control plane |
+| Test-RAC-Private-Networks.sh | Creates named disposable test pods, verifies scheduling/resource/sysctl/HugePages/network/DNS; retains pods for inspected cleanup |
+| Prepare-RAC-Worker.sh | One-time root sysctl/THP/kubelet/SELinux/home-directory preparation; current2GiB HugePages profile |
+| Adjust-RAC-HugePages.sh | Historical6GiB-to-2GiB correction with unused-page guards; not required for a fresh run |
+| Prepare-RAC-Staging.sh / Verify-RAC-Staged-Media.sh / Extract-RAC-RU.sh | Historical base/RU media workflow, not used by final gold-home manifest; extraction never invokes installers |
+| Prepare-RAC-Gold-Staging.sh | Creates empty, labeled gold-home transfer directories on exact scratch mounts |
+| Install-RAC-Cert-Manager.sh | Installs pinned prerequisite manifests and verifies readiness |
+| Install-RAC-Database-Operator.sh | Installs scoped operator/RBAC/certificates; no RacDatabase creation |
+| Prepare-RAC-Secrets-And-Labels.sh | Creates protected credentials and Kubernetes secrets, labels workers; refuses existing secrets |
+| Verify-RAC-Worker.sh | Checks persistent worker settings/storage/services/time, no provisioning |
+| Refresh-Lab-NTP.sh | Requests fresh Chrony samples and waits for synchronization; no clocksource/source-list changes |
+
+All helper identities reflect this inspected build. Update guards only from actual state when rebuilding. Source manifests are under config/vendor; config/rac-database.yaml is never applied by these prerequisite helpers. Database provisioning remains a separate user action.
+
+CVU helpers added after package delivery: Prepare-RAC-CVU-Staging.sh creates guarded scratch directories; Inspect-RAC-CVU.sh verifies/extracts the package and reads version/help; Verify-RAC-CVU.sh runs container-host validation without fixups as labadmin. See [CVU results and Bash commands](RAC-CVU-RESULTS.md).

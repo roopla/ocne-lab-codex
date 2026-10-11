@@ -1,0 +1,7 @@
+# SHA256 of canonical LF prerequisite YAML files; no secrets.
+0f4e0a10fb43467865a6d6f66d3de1f0af56a67fb81ca4266ac500f77f1d80dc  cert-manager-v1.17.4.yaml
+f582fcb8bcd90d02fc181e084489ccfee3ab3b1c46e50ada4d3afefee1ca1d7e  oracle-database-operator-2.2.0-rbac.yaml
+70a4d430779fb985d69f9babd87c2295bb11e1bae67f47269d9e62c7a8ed855c  oracle-database-operator-2.2.0-system.yaml
+d1a69ad959102d3765c9089bf0f8438a46a097dc3cbcfc8e20e964fee413d3a4  rac-multus-rbac.yaml
+bc1c48338150a82b5b8d12ae09b205689e99ea17eb673568f0c620615a7337a3  rac-node-rbac.yaml
+8f1e6be52911dd7aa08e648ea1967b78fe8deb9e3c0e5c178797b002ce3fe840  rac-pv-rbac.yaml

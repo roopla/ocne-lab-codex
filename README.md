@@ -2,7 +2,7 @@
 
 The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, including an ordered power cycle. The subsequent OCNE report completed at 22:10. This documentation was reconciled with those results on 8 October; that is a documentation review date, not a new live health check.
 
-Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** Database Operator and RAC remain a separate, paused task.
+Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** RAC infrastructure and operator prerequisites were prepared on 9-10 October after recovering the foundation from host Modern Standby interruptions. RAC has not been provisioned. Start with the [RAC handoff](docs/RAC-PROVISIONING-HANDOFF.md), [provisioning YAML](config/rac-database.yaml), and [readiness evidence](docs/RAC-READINESS.md). The user will supply the slim image and fully patched gold homes and will apply the RAC manifest themselves.
 
 ## Architecture at a glance
 

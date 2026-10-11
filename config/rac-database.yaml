@@ -1,0 +1,91 @@
+# USER-APPLIED ONLY. This file has not been applied to the cluster.
+# Supply your OL9 RAC slim image and fully patched 19.32 gold home ZIPs first.
+# No RU, OPatch, or one-off patch application is configured during provisioning.
+apiVersion: database.oracle.com/v4
+kind: RacDatabase
+metadata:
+  name: rac19c
+  namespace: rac
+spec:
+  instanceDetails:
+    nodeCount: 2
+    racHostSwLocation: /scratch/rac/cluster01
+    racNodeName: racnode
+    baseOnsTargetPort: 30200
+    baseLsnrTargetPort: 31522
+    privateIPDetails:
+      - name: macvlan-conf1
+        interface: ens1
+      - name: macvlan-conf2
+        interface: ens2
+    workerNodeSelector:
+      raccluster: raccluster01
+  # Replace with your actual image reference; this placeholder cannot be pulled.
+  image: example.invalid/ocne/rac-slim:19.32-ol9
+  imagePullPolicy: IfNotPresent
+  # For a private registry, create the registry secret and set imagePullSecret.
+  sshKeySecret:
+    name: rac-ssh-key
+    privKeySecretName: ssh-privkey
+    pubKeySecretName: ssh-pubkey
+  dbSecret:
+    name: rac-db-password
+    keyFileName: key.pem
+    pwdFileName: pwdfile.enc
+    encryptionType: pkeyutl
+    pkeyopt: rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256
+  asmDiskGroupDetails:
+    - name: DATA
+      redundancy: EXTERNAL
+      type: CRSDG
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm01
+        - /dev/disk/by-partlabel/ocne-rac-asm02
+  scanSvcName: racnode-scan
+  scanSvcTargetPort: 31521
+  serviceDetails:
+    name: labpdb
+  envVars:
+    - name: LOG_DIR
+      value: /tmp/orod
+    - name: TOTAL_MEMORY
+      value: '18432'
+  # Per pod: 16 GiB ordinary memory + 2 GiB HugePages, 4 of 6 worker CPUs.
+  # This is a constrained lab profile, not validated RAC workload capacity.
+  resources:
+    requests:
+      cpu: '4'
+      memory: 16Gi
+      hugepages-2Mi: 2Gi
+    limits:
+      cpu: '4'
+      memory: 16Gi
+      hugepages-2Mi: 2Gi
+  securityContext:
+    sysctls:
+      - name: kernel.shmall
+        value: '524288'
+      - name: kernel.shmmax
+        value: '2147483648'
+      - name: kernel.shmmni
+        value: '4096'
+      - name: kernel.sem
+        value: '250 32000 100 128'
+      - name: net.ipv4.conf.all.rp_filter
+        value: '2'
+  configParams:
+    gridHome: /u01/app/19c/grid
+    gridBase: /u01/app/grid
+    dbHome: /u01/app/oracle/product/19c/dbhome_1
+    dbBase: /u01/app/oracle
+    inventory: /u01/app/oraInventory
+    # Expected filenames; update these if your supplied ZIPs use other names.
+    gridSwZipFile: gi-home-19.32-gold.zip
+    dbSwZipFile: db-home-19.32-gold.zip
+    hostSwStageLocation: /scratch/software/stage/19c/19.32-gold
+    sgaSize: 1G
+    pgaSize: 2G
+    processes: 500
+    cpuCount: 4
+    dbName: RACCDB
+    pdbName: LABPDB

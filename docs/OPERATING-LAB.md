@@ -152,4 +152,22 @@ VM disks, NFS data and credentials are not backed up by Git. DPAPI-protected fil
 
 The last acceptance verified OCNE/Kubernetes, mounts, all-node NFS reads/writes, root squashing, enforcing SELinux and Windows SSH after restart. Operator/control-plane RAM remains below Oracle minimums. All VMs share one Windows host and one control plane.
 
-No new VM execution was performed for the October documentation revision. Database Operator, Multus, shared ASM disks, database/RAC workloads and Kubernetes storage provisioning remain outside the completed baseline. Their preparation stays paused.
+The 8 October revision changed documentation only. Subsequent work on 9-10 October added Database Operator, cert-manager, Multus, shared ASM partitions and worker prerequisites. RAC remains unprovisioned; see the [current handoff](RAC-PROVISIONING-HANDOFF.md) and [manual Bash guide](RAC-PREREQUISITES-GUIDE.md).
+
+## Keep Windows awake while the lab runs
+
+On 9 October, Windows Modern Standby interrupted the running VMs. Kernel-Power events 506/507 coincided with guest time jumps, VirtualBox timer lag and kernel soft-lockup messages. Kubernetes recovery required guest restarts; subsequent NTP, readiness and NFS checks are recorded in the run logs.
+
+The active Balanced plan's AC sleep timeout is now 0 (never), changed from 60 minutes. DC/battery sleep remains 3 minutes. Display settings were not changed. Check the active setting with:
+
+```powershell
+powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE
+```
+
+Shut the lab down in the documented order before explicit sleep, hibernation, Windows shutdown or switching to battery operation that may sleep. To restore the previous AC sleep setting after shutting down the lab:
+
+```powershell
+powercfg /change standby-timeout-ac 60
+```
+
+Saved prior settings: logs/power-before-rac-20261009.txt. Windows time-service resync required administrator privileges and was denied; a direct NTP query alone is not proof that Windows Time is synchronized. Guest Chrony uses its existing independent NTP sources. See Microsoft's [powercfg reference](https://learn.microsoft.com/en-us/windows-hardware/design/device-experiences/powercfg-command-line-options).
