@@ -49,24 +49,24 @@ spec:
     - name: LOG_DIR
       value: /tmp/orod
     - name: TOTAL_MEMORY
-      value: '18432'
-  # Per pod: 16 GiB ordinary memory + 2 GiB HugePages, 4 of 6 worker CPUs.
+      value: '19456'
+  # Per pod: 16 GiB ordinary memory + 3 GiB HugePages, 4 of 6 worker CPUs.
   # This is a constrained lab profile, not validated RAC workload capacity.
   resources:
     requests:
       cpu: '4'
       memory: 16Gi
-      hugepages-2Mi: 2Gi
+      hugepages-2Mi: 3Gi
     limits:
       cpu: '4'
       memory: 16Gi
-      hugepages-2Mi: 2Gi
+      hugepages-2Mi: 3Gi
   securityContext:
     sysctls:
       - name: kernel.shmall
-        value: '524288'
+        value: '786432'
       - name: kernel.shmmax
-        value: '2147483648'
+        value: '3221225472'
       - name: kernel.shmmni
         value: '4096'
       - name: kernel.sem
@@ -83,7 +83,7 @@ spec:
     gridSwZipFile: oracle-gridhome-19.32.zip
     dbSwZipFile: oracle-dbhome-19.32.zip
     hostSwStageLocation: /scratch/software/stage/19c/19.32-gold
-    sgaSize: 1G
+    sgaSize: 3G
     pgaSize: 2G
     processes: 500
     cpuCount: 4

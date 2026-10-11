@@ -150,11 +150,11 @@ flowchart TB
     OPERATOR["Database Operator 2.2.0<br/>Kubernetes controller + cert-manager"]
     subgraph WORKER1["ocne-w1 - 22 GiB / 6 vCPUs"]
         S1[("128 GiB scratch<br/>/scratch - XFS")]
-        P1["Future racnode1 pod<br/>16 GiB memory + 2 GiB HugePages<br/>4 CPUs - not provisioned"]
+        P1["Future racnode1 pod<br/>16 GiB memory + 3 GiB HugePages<br/>4 CPUs - not provisioned"]
     end
     subgraph WORKER2["ocne-w2 - 22 GiB / 6 vCPUs"]
         S2[("128 GiB scratch<br/>/scratch - XFS")]
-        P2["Future racnode2 pod<br/>16 GiB memory + 2 GiB HugePages<br/>4 CPUs - not provisioned"]
+        P2["Future racnode2 pod<br/>16 GiB memory + 3 GiB HugePages<br/>4 CPUs - not provisioned"]
     end
     ASM[("Shared ASM01 + ASM02<br/>2 x 50 GiB fixed/shareable VDI<br/>GPT partitions; no ASM disk group yet")]
     N1["Private1 - 192.168.78.0/24<br/>VirtualBox intnet + Multus macvlan"]

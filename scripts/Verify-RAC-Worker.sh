@@ -12,7 +12,7 @@ esac
 [[ $(getenforce) == Enforcing ]]
 [[ $(wc -l < /proc/swaps) == 1 ]]
 [[ $(cat /sys/devices/system/clocksource/clocksource0/current_clocksource) == tsc ]]
-[[ $(sysctl -n vm.nr_hugepages) == 1024 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
 grep -F '[never]' /sys/kernel/mm/transparent_hugepage/enabled
 [[ $(awk '/Hugepagesize:/{print $2}' /proc/meminfo) == 2048 ]]
 grep -F -- '--allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem' /etc/sysconfig/kubelet

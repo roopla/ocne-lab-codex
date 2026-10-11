@@ -28,10 +28,10 @@ net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1024
+vm.nr_hugepages = 1536
 SYSCTL
 sysctl -p /etc/sysctl.d/98-ocne-rac.conf
-[[ $(sysctl -n vm.nr_hugepages) == 1024 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
 # Oracle recommends disabling THP; use grubby for OL9 boot entries.
 grubby --update-kernel=ALL --args='transparent_hugepage=never'
 printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled

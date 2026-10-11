@@ -19,8 +19,8 @@ The sample provides the two-node structure, Oracle home paths, private-network r
 | Networks and placement | Two nodes, `macvlan-conf1`/`macvlan-conf2`, `ens1`/`ens2`, `raccluster=raccluster01` | Retained and matched to the installed NADs and worker labels; ONS/listener base target ports explicitly set to 30200/31522 |
 | Credentials | `ssh-key-secret`, `db-user-pass`; pkeyutl options commented | Existing `rac-ssh-key` and `rac-db-password`; explicit pkeyutl OAEP/SHA256 options matching the prepared secret |
 | TDE | Includes `tdeWalletSecret` | Omitted; TDE was not configured for this lab |
-| CPU and memory | No explicit resource block in this sample | Each pod requests/limits 4 CPUs, 16 GiB ordinary memory and 2 GiB HugePages on a 22 GiB/6 CPU worker; adds pod sysctls matching prepared host settings |
-| Database settings | `PORCLCDB`, service `soepdb` | `RACCDB`, PDB `LABPDB`, service `labpdb`; SGA 1G, PGA 2G, 500 processes, cpuCount 4 and TOTAL_MEMORY 18432 for this constrained lab |
+| CPU and memory | No explicit resource block in this sample | Each pod requests/limits 4 CPUs, 16 GiB ordinary memory and 3 GiB HugePages on a 22 GiB/6 CPU worker; adds pod sysctls matching prepared host settings |
+| Database settings | `PORCLCDB`, service `soepdb` | `RACCDB`, PDB `LABPDB`, service `labpdb`; SGA 3G, PGA 2G, 500 processes, cpuCount 4 and TOTAL_MEMORY 19456 for this constrained lab |
 | Patch application | Base gold-home example has no patch-application fields | Retained the gold-home route; no RU/OPatch/one-off application fields, because supplied homes are already patched |
 
 The added fields were checked against the pinned [RacDatabase API types](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_types.go), [admission validation](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_webhook.go), and [pod construction code](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/commons/crs/rac/racprovcluster.go). In particular, the operator requires at least 16 GiB ordinary memory; HugePages are additional. These resource choices are lab sizing, not Oracle-validated RAC capacity. Prerequisite-ignore and webhook development-mode flags are not enabled.
@@ -32,7 +32,7 @@ Validation already performed: YAML parsing, image/ZIP staging checks, exact Wind
 - Two 22 GiB/6 CPU workers, each with 128GiB scratch and its existing 100 GiB container disk.
 - Two shared 50 GiB ASM partitions, identified by persistent labels; unformatted and unused by ASM.
 - Two tested private macvlan interconnects, OCNE Multus, worker labels, and mounted host NFS.
-- Kernel settings, 2 GiB HugePages per worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
+- Kernel settings, 3 GiB HugePages per worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
 - Cert-manager1.17.4, Database Operator 2.2.0, required RBAC and Ready operator certificates.
 - Protected database-password and RAC SSH secrets.
 
@@ -135,7 +135,7 @@ kubectl get pvc -n rac
 kubectl create --dry-run=server -f ~/ocne-rac-prereqs/rac-database.yaml
 ```
 
-After editing the Windows YAML, copy that exact version to ocne-cp before the dry-run. Inspect the worker resource budgets and both gold files/images as above. Re-run the worker/network/NFS checks if any relevant setting changed. The final YAML requests 4CPUs,16 GiB ordinary memory and2GiB HugePages per pod; it sets SGA1G and PGA2G for this limited lab. Do not set prerequisite-ignore or webhook development-mode flags to make acceptance pass.
+After editing the Windows YAML, copy that exact version to ocne-cp before the dry-run. Inspect the worker resource budgets and both gold files/images as above. Re-run the worker/network/NFS checks if any relevant setting changed. The final YAML requests 4CPUs,16 GiB ordinary memory and3GiB HugePages per pod; it sets SGA3G and PGA2G for this limited lab. Do not set prerequisite-ignore or webhook development-mode flags to make acceptance pass.
 
 Credential recovery is local to ocne-cp: ~/.local/share/ocne-rac-secrets/db-password.txt, protected 0600 under a0700 directory. Retrieve it only in your private interactive session; do not paste it into chat, documentation or Git. Kubernetes secrets already exist and are referenced by name in the YAML.
 

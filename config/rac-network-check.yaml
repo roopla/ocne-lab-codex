@@ -25,11 +25,11 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
     volumeMounts:
     - name: hugepages
       mountPath: /hugepages
@@ -38,9 +38,9 @@ spec:
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '2147483648'
+      value: '3221225472'
     - name: kernel.shmall
-      value: '524288'
+      value: '786432'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
@@ -77,11 +77,11 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
     volumeMounts:
     - name: hugepages
       mountPath: /hugepages
@@ -90,9 +90,9 @@ spec:
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '2147483648'
+      value: '3221225472'
     - name: kernel.shmall
-      value: '524288'
+      value: '786432'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter

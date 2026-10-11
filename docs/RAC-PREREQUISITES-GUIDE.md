@@ -104,7 +104,7 @@ olcnectl module report --environment-name homelab --name rac-multus --children
 
 If the module already exists, inspect its state instead of creating another. On ocne-cp, apply the reviewed [rac-networks.yaml](../config/rac-networks.yaml) and verify the Multus daemonset is 3/3Ready and both NADs exist in rac. They use macvlan bridge mode, host-local IPAM, enp0s8/enp0s9, and subnets192.168.78/24 and192.168.79/24. The operator assigns explicit per-node addresses from rangeStart120; host-local alone does not coordinate allocation across workers. Dedicate these NADs to this RAC cluster.
 
-Run [Test-RAC-Private-Networks.sh](../scripts/Test-RAC-Private-Networks.sh) as labadmin on ocne-cp (it embeds [the test manifest](../config/rac-network-check.yaml)). Its disposable pods use .128/.129 on both networks, NET_RAW for ping, and test both directions with 1472-byte payloads plus Kubernetes DNS. The final test uses node selectors so the scheduler must place each pod with 4CPU,16 GiB ordinary memory and2GiB HugePages requests; it also verifies the HugePages mount and an allowed pod sysctl. Inspect any existing test pods before replacing them. Remove only those named diagnostic pods after success. No RAC pod is created by this test.
+Run [Test-RAC-Private-Networks.sh](../scripts/Test-RAC-Private-Networks.sh) as labadmin on ocne-cp (it embeds [the test manifest](../config/rac-network-check.yaml)). Its disposable pods use .128/.129 on both networks, NET_RAW for ping, and test both directions with 1472-byte payloads plus Kubernetes DNS. The final test uses node selectors so the scheduler must place each pod with 4CPU,16 GiB ordinary memory and3GiB HugePages requests; it also verifies the HugePages mount and an allowed pod sysctl. Inspect any existing test pods before replacing them. Remove only those named diagnostic pods after success. No RAC pod is created by this test.
 
 ## 4. Configure each worker's OS
 
@@ -117,10 +117,10 @@ net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1024
+vm.nr_hugepages = 1536
 ```
 
-Load with `sysctl -p /etc/sysctl.d/98-ocne-rac.conf`; require1024 pages of 2048KiB (2 GiB). Keep swap disabled. TSC was already selected; verify it rather than blindly changing clocksources. Disable THP with `grubby --update-kernel=ALL --args='transparent_hugepage=never'` and write never to /sys/kernel/mm/transparent_hugepage/enabled. Retain existing boot arguments.
+Load with `sysctl -p /etc/sysctl.d/98-ocne-rac.conf`; require1536 pages of 2048KiB (3 GiB). Keep swap disabled. TSC was already selected; verify it rather than blindly changing clocksources. Disable THP with `grubby --update-kernel=ALL --args='transparent_hugepage=never'` and write never to /sys/kernel/mm/transparent_hugepage/enabled. Retain existing boot arguments.
 
 Preserve all existing kubelet arguments while adding `--allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem` to KUBELET_EXTRA_ARGS. This run's original extra argument was --fail-swap-on=false. Run systemctl daemon-reload and restart kubelet. The unsafe-sysctl allowance is Oracle's documented RAC requirement; do not disable SELinux/firewalld.
 
@@ -130,7 +130,7 @@ Create /scratch/rac/cluster01/racnode1 and racnode2 on both workers, owner54321:
 
 Reboot workers one at a time and verify boot IDs changed, all settings survived, private NICs are still PROMISC, original storage is mounted, Chrony synchronized and Kubernetes nodes recovered. [Verify-RAC-Worker.sh](../scripts/Verify-RAC-Worker.sh) performs these prerequisite checks. Check NFS again. Never reboot both workers simultaneously during an active RAC workload without a planned shutdown.
 
-Memory rationale: the operator 2.2.0 webhook requires a16GiB ordinary-memory limit. The lab manifest requests/limits16GiB ordinary memory plus 2GiB HugePages, and4CPUs per worker. SGA1G/PGA2G leaves headroom for GI/ASM in this small lab. HugePages are separately reserved by Kubernetes; adding them to16GiB gives18GiB, not 16GiB total. We did not enable the development-mode validation bypass or ignore Oracle prerequisite failures. Runtime capacity remains untested until the user provisions RAC.
+Memory rationale: the operator 2.2.0 webhook requires a16GiB ordinary-memory limit. The lab manifest requests/limits16GiB ordinary memory plus 3GiB HugePages, and4CPUs per worker. SGA3G/PGA2G is the current lab profile. The 3 GiB SGA equals the configured HugePages reservation; actual GI/ASM usage and database allocation must be checked during provisioning. HugePages are separately reserved by Kubernetes; adding them to16GiB gives19GiB, not 16GiB total. We did not enable the development-mode validation bypass or ignore Oracle prerequisite failures. Runtime capacity remains untested until the user provisions RAC.
 
 ## 5. Install cert-manager and Oracle Database Operator
 
@@ -400,10 +400,10 @@ net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1024
+vm.nr_hugepages = 1536
 SYSCTL
 sysctl -p /etc/sysctl.d/98-ocne-rac.conf
-[[ $(sysctl -n vm.nr_hugepages) == 1024 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
 # Oracle recommends disabling THP; use grubby for OL9 boot entries.
 grubby --update-kernel=ALL --args='transparent_hugepage=never'
 printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
@@ -526,7 +526,7 @@ esac
 [[ $(getenforce) == Enforcing ]]
 [[ $(wc -l < /proc/swaps) == 1 ]]
 [[ $(cat /sys/devices/system/clocksource/clocksource0/current_clocksource) == tsc ]]
-[[ $(sysctl -n vm.nr_hugepages) == 1024 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
 grep -F '[never]' /sys/kernel/mm/transparent_hugepage/enabled
 [[ $(awk '/Hugepagesize:/{print $2}' /proc/meminfo) == 2048 ]]
 grep -F -- '--allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem' /etc/sysconfig/kubelet
@@ -598,3 +598,37 @@ done
 ```
 
 The Bash host equivalent has been syntax-checked, not executed as a second provisioning run. Compare every result with the intended inventory and stop on partial state. Do not rerun creation to recover an error. On a Linux VirtualBox host, set VBOX to its installed executable and LAB_ROOT to the intended project directory instead; Windows host inspection/power settings do not apply there.
+
+## Adjusting an already prepared worker to the 3 GiB profile
+
+The current manifest uses SGA 3G, PGA 2G, 16Gi ordinary memory and 3Gi HugePages per RAC pod. The new-build commands above already use 1536 two-MiB HugePages. For an existing pre-provisioning lab with the former 1024-page reservation, use [Increase-RAC-HugePages.sh](../scripts/Increase-RAC-HugePages.sh) on one worker at a time. It requires the exact lab hostname/filesystem identity and a completely unused HugePages pool, backs up the configuration, changes only the HugePages line, and restarts kubelet. It must not be used while an active RAC database consumes HugePages.
+
+First, on ocne-cp, confirm there are no RAC resources/pods. From the workstation in Git Bash, copy the scripts through the existing authenticated SSH aliases:
+
+```bash
+ssh ocne-cp 'kubectl get racdatabases -A; kubectl get pods -n rac'
+for node in ocne-w1 ocne-w2; do
+  scp scripts/Increase-RAC-HugePages.sh scripts/Test-RAC-HugePages.sh scripts/Verify-RAC-Worker.sh "$node":/home/labadmin/
+done
+```
+
+On each worker in an interactive SSH session, validate then execute:
+
+```bash
+bash -n ~/Increase-RAC-HugePages.sh
+sudo bash ~/Increase-RAC-HugePages.sh
+sudo bash ~/Test-RAC-HugePages.sh
+sudo bash ~/Verify-RAC-Worker.sh
+sudo grep -Fx 'vm.nr_hugepages = 1536' /etc/sysctl.d/98-ocne-rac.conf
+```
+
+The [HugePages allocation test](../scripts/Test-RAC-HugePages.sh) creates its own temporary file under /dev/hugepages, maps and touches the complete 3 GiB pool, then releases it. Its free-page guards prevent running alongside a workload already using HugePages. These checks succeeded on this lab; the changed setting is saved for boot, but no worker reboot was performed in this adjustment.
+
+On ocne-cp, check the first worker recovered before adjusting the second:
+
+```bash
+kubectl wait --for=condition=Ready node/ocne-w1.lab.test --timeout=60s
+kubectl get nodes -o custom-columns=NAME:.metadata.name,MEMORY:.status.allocatable.memory,HUGEPAGES:.status.allocatable.hugepages-2Mi
+```
+
+After both workers advertise 3Gi HugePages, run the updated network/scheduling test, remove only its two named diagnostic pods, copy the final RAC YAML, and run server-side dry-run as documented in the handoff. The diagnostic test uses BusyBox; it does not configure a database. [Kubernetes HugePages documentation](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/) explains allocation and kubelet resource advertisement.

@@ -72,3 +72,17 @@ kubectl get pvc -n rac
 ```
 
 Only the separate user-only step in the handoff applies the manifest. CVU host checks passed previously on both workers; RAC runtime, live patch inventories and SQL patch status must be validated after user provisioning. Secrets, ZIPs, image layers and raw output are excluded from Git.
+
+## SGA increase - 10 October, 21:59 EDT
+
+At the user's request, increased sgaSize from 1G to 2G per RAC instance, retaining PGA 2G, 16 GiB ordinary pod memory and 2 GiB HugePages. Both workers reported all 1024 two-MiB HugePages free before provisioning. The revised YAML passed server-side create dry-run; no RacDatabase exists. Windows/control-plane copies match SHA256 `01e10e9c9fef99fc07a34c8f8a5d51f5a2b4b2fe825f8f11ef362484d082fe85`. This supersedes the earlier manifest fingerprint in the chronological logs. Runtime capacity remains untested.
+
+## SGA 3 GiB and matching HugePages - 2026-10-10 22:01-22:08 EDT
+
+The user authorized 3 GiB SGA per RAC instance. Updated sgaSize to 3G, HugePages request/limit to 3Gi, TOTAL_MEMORY to 19456 MiB, kernel.shmmax to 3221225472 bytes and kernel.shmall to 786432 four-KiB pages. PGA remains 2G, ordinary pod memory 16Gi, CPU 4 and worker RAM 22Gi. Updated diagnostic manifests and future-build/verification scripts consistently.
+
+Inspected host state and confirmed no RAC resource/pods existed. On each worker sequentially, guarded by its scratch UUID and completely unused HugePages pool, backed up /etc/sysctl.d/98-ocne-rac.conf under /var/opt/ocne-rac-hugepages-backup-<timestamp>, increased vm.nr_hugepages from 1024 to 1536, saved that setting and restarted kubelet. Both workers remained Ready and advertised 3Gi HugePages; ordinary allocatable memory was 18877204Ki/18877232Ki. No VM reboot was performed. Persistence is configured in sysctl.d; this new value has not yet been verified across reboot.
+
+The two diagnostic pods scheduled with 4CPU, 16Gi ordinary memory and 3Gi HugePages. Both private networks passed bidirectional 1472-byte payload pings and DNS; hugetlbfs mounts and the new shmmax were verified. Removed only the two named test pods. Separately used a temporary hugetlbfs file and mmap on each host to allocate and touch all 1536 HugePages (3 GiB), then unmapped/unlinked it and verified every page was free again. Worker checks passed for SELinux, mounts, private NICs, THP, kernel settings, services and Chrony. This is host allocation and diagnostic scheduling evidence, not a RAC runtime test.
+
+The revised manifest passed server-side create dry-run. Windows/control-plane copies match SHA256 `8c76f48256eb145460033b2499b80a7a736d77d14fd95931200dfa4a0a7790b2`. No RacDatabase or pods remain in namespace rac. The earlier 2G dry-run/fingerprint entries are historical; 3G is now the user-selected configuration. No RAC provisioning was performed.

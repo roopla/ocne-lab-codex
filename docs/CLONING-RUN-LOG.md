@@ -194,3 +194,21 @@ At the user's request, added the exact pinned Oracle 2.2.0 racdb_prov.yaml sourc
 ## DBCA prerequisite decision - 2026-10-10 21:56 EDT
 
 The user confirmed that DBCA fix 34436514 is unnecessary for the supplied 19.32 home. Closed the remaining prerequisite question based on that owner confirmation, without claiming independently verified Oracle Support applicability or binary supersedence. Updated current readiness, artifact acceptance and handoff documentation; historical entries above retain the earlier unresolved state. No patch was applied, no manifest or artifact changed, and no RAC provisioning was performed. The user retains the provisioning step following their YAML review.
+
+## SGA increase and sizing inspection - 2026-10-10 21:59 EDT
+
+Increased manifest SGA from 1G to 2G per instance following the user's request; PGA remains 2G. Verified both workers report 1024 free two-MiB HugePages and Kubernetes advertises 2Gi HugePages. The installed operator's source requires HugePages at least equal to SGA and accepts this configuration. Copied the updated YAML to ocne-cp and successfully ran server-side create dry-run. Both manifest copies have SHA256 01e10e9c9fef99fc07a34c8f8a5d51f5a2b4b2fe825f8f11ef362484d082fe85. No RacDatabase resource exists; no guest settings were changed. Updated current sizing documentation while retaining historical results.
+
+For the user's maximum-SGA question, observed worker1 ordinary allocatable memory 19909396Ki and existing pod requests 520Mi. A hypothetical increase from 2Gi to 4Gi HugePages would leave about 490.77Mi ordinary scheduling headroom after a 16Gi RAC pod request. This is an accounting estimate, not validated runtime capacity; some existing pods have no memory requests. Suggested 3Gi as a more conservative next increase. Any increase beyond the current 2Gi needs corresponding host/pod HugePages and sysctl changes and fresh scheduling/guest checks. No 3Gi/4Gi change was performed.
+
+## SGA 3 GiB and matching HugePages - 2026-10-10 22:01-22:08 EDT
+
+The user authorized 3 GiB SGA per RAC instance. Updated sgaSize to 3G, HugePages request/limit to 3Gi, TOTAL_MEMORY to 19456 MiB, kernel.shmmax to 3221225472 bytes and kernel.shmall to 786432 four-KiB pages. PGA remains 2G, ordinary pod memory 16Gi, CPU 4 and worker RAM 22Gi. Updated diagnostic manifests and future-build/verification scripts consistently.
+
+Inspected host state and confirmed no RAC resource/pods existed. On each worker sequentially, guarded by its scratch UUID and completely unused HugePages pool, backed up /etc/sysctl.d/98-ocne-rac.conf under /var/opt/ocne-rac-hugepages-backup-<timestamp>, increased vm.nr_hugepages from 1024 to 1536, saved that setting and restarted kubelet. Both workers remained Ready and advertised 3Gi HugePages; ordinary allocatable memory was 18877204Ki/18877232Ki. No VM reboot was performed. Persistence is configured in sysctl.d; this new value has not yet been verified across reboot.
+
+The two diagnostic pods scheduled with 4CPU, 16Gi ordinary memory and 3Gi HugePages. Both private networks passed bidirectional 1472-byte payload pings and DNS; hugetlbfs mounts and the new shmmax were verified. Removed only the two named test pods. Separately used a temporary hugetlbfs file and mmap on each host to allocate and touch all 1536 HugePages (3 GiB), then unmapped/unlinked it and verified every page was free again. Worker checks passed for SELinux, mounts, private NICs, THP, kernel settings, services and Chrony. This is host allocation and diagnostic scheduling evidence, not a RAC runtime test.
+
+The revised manifest passed server-side create dry-run. Windows/control-plane copies match SHA256 `8c76f48256eb145460033b2499b80a7a736d77d14fd95931200dfa4a0a7790b2`. No RacDatabase or pods remain in namespace rac. The earlier 2G dry-run/fingerprint entries are historical; 3G is now the user-selected configuration. No RAC provisioning was performed.
+
+Final validation at 22:11 EDT passed for all three Kubernetes nodes, all current deployments and all 22 pods. Five changed/new Bash scripts and 29 documentation Bash blocks parsed; the diagnostic YAML matches its embedded script, and the 3Gi HugePages/SGA/shared-memory values are consistent. Documentation validation passed for 18 Markdown files and 132 local links.

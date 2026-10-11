@@ -36,11 +36,11 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
     volumeMounts:
     - name: hugepages
       mountPath: /hugepages
@@ -49,9 +49,9 @@ spec:
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '2147483648'
+      value: '3221225472'
     - name: kernel.shmall
-      value: '524288'
+      value: '786432'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
@@ -88,11 +88,11 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 2Gi
+        hugepages-2Mi: 3Gi
     volumeMounts:
     - name: hugepages
       mountPath: /hugepages
@@ -101,9 +101,9 @@ spec:
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '2147483648'
+      value: '3221225472'
     - name: kernel.shmall
-      value: '524288'
+      value: '786432'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
@@ -120,7 +120,7 @@ for i in 1 2; do
  pod=rac-netcheck-w$i
  if [[ $i == 1 ]]; then own=128; peer=129; else own=129; peer=128; fi
  kubectl exec -n rac "$pod" -- cat /proc/mounts | grep -E '^[^ ]+ /hugepages hugetlbfs '
- kubectl exec -n rac "$pod" -- sysctl -n kernel.shmmax | grep -Fx 2147483648
+ kubectl exec -n rac "$pod" -- sysctl -n kernel.shmmax | grep -Fx 3221225472
  kubectl exec -n rac "$pod" -- ip -4 address show
  kubectl exec -n rac "$pod" -- ip -4 address show dev ens1 | grep -F "192.168.78.$own/24"
  kubectl exec -n rac "$pod" -- ip -4 address show dev ens2 | grep -F "192.168.79.$own/24"
