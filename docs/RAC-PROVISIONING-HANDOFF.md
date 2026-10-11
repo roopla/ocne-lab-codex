@@ -4,6 +4,29 @@ RAC has **not** been provisioned. The operator's server-side create dry-run acce
 
 For a manual rebuild, follow [the prerequisite guide](RAC-PREREQUISITES-GUIDE.md), including its direct Bash command appendix. Actual results are in [the run log](CLONING-RUN-LOG.md) and [readiness inventory](RAC-READINESS.md).
 
+## Manifest source and lab adaptations
+
+[config/rac-database.yaml](../config/rac-database.yaml) follows Oracle Database Operator 2.2.0's [RAC provisioning sample, docs/rac/provisioning/racdb_prov.yaml](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/racdb_prov.yaml), pinned to commit `ff6f9178c1650df30afbf203ebdb633e9b80760a`. The accompanying [provisioning procedure](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/provisioning_oracle_rac_db.md) explains the slim-image and staged-home workflow. The separate `config/samples/database_v4_racdatabase.yaml` in that repository is only a skeleton with a TODO; the detailed provisioning sample is the relevant reference.
+
+The sample provides the two-node structure, Oracle home paths, private-network references, worker selector, ASM disk-group structure and secret references. Our values are local lab adaptations:
+
+| Setting | Oracle sample | This lab and reason |
+|---|---|---|
+| Resource identity | `racdbprov-sample`, namespace `rac` | `rac19c`, namespace `rac` |
+| Container image | `dbocir/oracle/database-rac:19.3.0-slim`, policy `Always` | User's `roopla/oracle-rac:19.3.0-slim`, pinned to the verified digest with `IfNotPresent`; identical image staged in both CRI-O stores |
+| Home archives | `grid_home.zip`, `db_home.zip`; stage under `19.28GoldImageSoftware` | `oracle-gridhome-19.32.zip`, `oracle-dbhome-19.32.zip`; `/scratch/software/stage/19c/19.32-gold` |
+| ASM devices | `qck-ocne19-asmdisk1` and `qck-ocne19-asmdisk2` partition labels | Verified shared partitions `ocne-rac-asm01` and `ocne-rac-asm02`; retained `DATA`, `EXTERNAL`, `CRSDG` |
+| Networks and placement | Two nodes, `macvlan-conf1`/`macvlan-conf2`, `ens1`/`ens2`, `raccluster=raccluster01` | Retained and matched to the installed NADs and worker labels; ONS/listener base target ports explicitly set to 30200/31522 |
+| Credentials | `ssh-key-secret`, `db-user-pass`; pkeyutl options commented | Existing `rac-ssh-key` and `rac-db-password`; explicit pkeyutl OAEP/SHA256 options matching the prepared secret |
+| TDE | Includes `tdeWalletSecret` | Omitted; TDE was not configured for this lab |
+| CPU and memory | No explicit resource block in this sample | Each pod requests/limits 4 CPUs, 16 GiB ordinary memory and 2 GiB HugePages on a 22 GiB/6 CPU worker; adds pod sysctls matching prepared host settings |
+| Database settings | `PORCLCDB`, service `soepdb` | `RACCDB`, PDB `LABPDB`, service `labpdb`; SGA 1G, PGA 2G, 500 processes, cpuCount 4 and TOTAL_MEMORY 18432 for this constrained lab |
+| Patch application | Base gold-home example has no patch-application fields | Retained the gold-home route; no RU/OPatch/one-off application fields, because supplied homes are already patched |
+
+The added fields were checked against the pinned [RacDatabase API types](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_types.go), [admission validation](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_webhook.go), and [pod construction code](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/commons/crs/rac/racprovcluster.go). In particular, the operator requires at least 16 GiB ordinary memory; HugePages are additional. These resource choices are lab sizing, not Oracle-validated RAC capacity. Prerequisite-ignore and webhook development-mode flags are not enabled.
+
+Validation already performed: YAML parsing, image/ZIP staging checks, exact Windows/control-plane manifest SHA256 match, and successful server-side create dry-run on 10 October at 21:39 EDT. The resource has **not been applied**. API acceptance does not prove database runtime behavior; the remaining DBCA fix applicability question and post-provisioning checks are documented below and in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
+
 ## Prepared infrastructure
 
 - Two 22 GiB/6 CPU workers, each with 128GiB scratch and its existing 100 GiB container disk.
