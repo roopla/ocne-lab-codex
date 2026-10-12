@@ -1,0 +1,19 @@
+sequenceDiagram
+  participant UI as Browser
+  participant API as Node gateway
+  participant SVC as Python or Java
+  participant DB as Oracle RAC
+  UI->>UI: Generate UUID, save UUID and text locally
+  UI->>API: POST id=123, text=hello
+  API->>SVC: Forward exactly once
+  SVC->>DB: INSERT with primary key 123
+  DB-->>SVC: COMMIT succeeds
+  SVC--xUI: Response is lost
+  UI->>UI: Keep same UUID and text, outcome unknown
+  UI->>API: Retry id=123, text=hello
+  API->>SVC: Forward exactly once
+  SVC->>DB: INSERT hits unique constraint
+  SVC->>DB: ROLLBACK failed insert, SELECT id=123
+  DB-->>SVC: Existing committed row
+  SVC-->>UI: 200 deduplicated=true, one record
+  Note over SVC,DB: Changed text with the same ID returns 409

@@ -1,0 +1,560 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-frontend
+  namespace: rac-app
+  labels: &id001
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-frontend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels: &id002
+      app.kubernetes.io/name: board-frontend
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        raccluster: raccluster01
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels: *id002
+      containers:
+      - name: frontend
+        image: localhost/rac-board-frontend:1.0.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: GATEWAY_URL
+          value: http://board-gateway:8081
+        - name: PORT
+          value: '8080'
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            cpu: 250m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 2
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 12
+          failureThreshold: 2
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-frontend
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-frontend
+spec:
+  selector:
+    app.kubernetes.io/name: board-frontend
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    nodePort: 30080
+  type: NodePort
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: board-frontend
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: board-frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-gateway
+  namespace: rac-app
+  labels: &id001
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-gateway
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels: &id002
+      app.kubernetes.io/name: board-gateway
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        raccluster: raccluster01
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels: *id002
+      containers:
+      - name: gateway
+        image: localhost/rac-board-gateway:1.0.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8081
+          name: http
+        env:
+        - name: TASKS_URL
+          value: http://board-tasks:8082
+        - name: NOTES_URL
+          value: http://board-notes:8083
+        - name: PORT
+          value: '8081'
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            cpu: 100m
+            memory: 96Mi
+          limits:
+            cpu: 500m
+            memory: 192Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 2
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 12
+          failureThreshold: 2
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-gateway
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: board-gateway
+  ports:
+  - name: http
+    port: 8081
+    targetPort: http
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: board-gateway
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-gateway
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: board-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-tasks
+  namespace: rac-app
+  labels: &id001
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-tasks
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels: &id002
+      app.kubernetes.io/name: board-tasks
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        raccluster: raccluster01
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels: *id002
+      containers:
+      - name: tasks
+        image: localhost/rac-board-tasks:1.0.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8082
+          name: http
+        env:
+        - name: PORT
+          value: '8082'
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STORE_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: STORE_MODE
+        - name: EXPECTED_PDB
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: EXPECTED_PDB
+        - name: DB_DSN
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: DB_DSN
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: board-tasks-db
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: board-tasks-db
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 2
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 12
+          failureThreshold: 2
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-tasks
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-tasks
+spec:
+  selector:
+    app.kubernetes.io/name: board-tasks
+  ports:
+  - name: http
+    port: 8082
+    targetPort: http
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: board-tasks
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-tasks
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: board-tasks
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-notes
+  namespace: rac-app
+  labels: &id001
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-notes
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels: &id002
+      app.kubernetes.io/name: board-notes
+  template:
+    metadata:
+      labels: *id001
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector:
+        raccluster: raccluster01
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels: *id002
+      containers:
+      - name: notes
+        image: localhost/rac-board-notes:1.0.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8083
+          name: http
+        env:
+        - name: PORT
+          value: '8083'
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: STORE_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: STORE_MODE
+        - name: EXPECTED_PDB
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: EXPECTED_PDB
+        - name: DB_DSN
+          valueFrom:
+            configMapKeyRef:
+              name: rac-board-config
+              key: DB_DSN
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: board-notes-db
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: board-notes-db
+              key: password
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 750m
+            memory: 384Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 2
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 2
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 12
+          failureThreshold: 2
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-notes
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-notes
+spec:
+  selector:
+    app.kubernetes.io/name: board-notes
+  ports:
+  - name: http
+    port: 8083
+    targetPort: http
+  type: ClusterIP
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: board-notes
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+    app.kubernetes.io/name: board-notes
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: board-notes

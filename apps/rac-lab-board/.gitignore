@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+.venv/
+build/
+lib/
+*.class
+*.jar
+*.pyc
+.env
+*.secret
+*.tar
+*.zip

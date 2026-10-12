@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RAC Lab Board</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <a class="brand" href="/" aria-label="RAC Lab Board home"
+          ><span class="mark">R</span
+          ><span>RAC <strong>Lab Board</strong></span></a
+        ><span class="eyebrow"
+          >OCNE &middot; THREE LANGUAGES &middot; ONE DATABASE</span
+        >
+      </header>
+      <main>
+        <section class="intro">
+          <div>
+            <div class="eyebrow">AN APPLICATION YOU CAN TAKE APART</div>
+            <h1>One board.<br /><span>Every layer visible.</span></h1>
+            <p>
+              Create a task, leave a handover note, then watch the request move
+              through your services and RAC database.
+            </p>
+          </div>
+          <div class="connection">
+            <span id="connection-dot" class="dot"></span
+            ><strong id="connection">Checking services</strong
+            ><span id="checked">Waiting for first response</span
+            ><button id="refresh" class="quiet">Refresh now &#8635;</button>
+          </div>
+        </section>
+        <div id="mode-banner" class="banner">
+          Connecting to the application...
+        </div>
+        <section aria-label="Request architecture" class="flow">
+          <div>
+            <small>01 / PRESENTATION</small><b>Browser + frontend</b
+            ><span id="frontend-pod">Vanilla JavaScript</span>
+          </div>
+          <i>&rarr;</i>
+          <div>
+            <small>02 / ROUTING</small><b>Node.js gateway</b
+            ><span id="gateway-pod">Loading...</span>
+          </div>
+          <i>&rarr;</i>
+          <div>
+            <small>03 / MICROSERVICES</small><b>Python + Java</b
+            ><span>Independent APIs & schemas</span>
+          </div>
+          <i>&rarr;</i>
+          <div>
+            <small>04 / PERSISTENCE</small><b>Oracle RAC</b
+            ><span>LABPDB / labpdb_app</span>
+          </div>
+        </section>
+        <div class="section-title">
+          <h2>Your lab workspace</h2>
+          <span
+            >Latest 100 entries per service &middot; refreshes every 10
+            seconds</span
+          >
+        </div>
+        <section class="boards">
+          <article class="board" data-kind="tasks">
+            <div class="board-head">
+              <div>
+                <span class="language python">PYTHON</span>
+                <h2>Lab tasks</h2>
+                <p>Small actions for your next experiment.</p>
+              </div>
+              <span class="health" id="tasks-health">Checking</span>
+            </div>
+            <form id="tasks-form">
+              <label for="tasks-text">What would you like to test?</label>
+              <div class="compose">
+                <textarea
+                  id="tasks-text"
+                  maxlength="800"
+                  rows="2"
+                  required
+                  placeholder="Verify writes survive an instance failover"
+                ></textarea
+                ><button type="submit" id="tasks-submit">
+                  Add task <span>&#8599;</span>
+                </button>
+              </div>
+              <p
+                class="form-status"
+                id="tasks-message"
+                role="status"
+                aria-live="polite"
+              ></p>
+            </form>
+            <ul id="tasks-list" class="entries">
+              <li class="empty">Loading tasks...</li>
+            </ul>
+            <footer id="tasks-route">Waiting for a request</footer>
+          </article>
+          <article class="board" data-kind="notes">
+            <div class="board-head">
+              <div>
+                <span class="language java">JAVA</span>
+                <h2>Handover notes</h2>
+                <p>Keep observations for the next person.</p>
+              </div>
+              <span class="health" id="notes-health">Checking</span>
+            </div>
+            <form id="notes-form">
+              <label for="notes-text">What did you observe?</label>
+              <div class="compose">
+                <textarea
+                  id="notes-text"
+                  maxlength="800"
+                  rows="2"
+                  required
+                  placeholder="Both instances are serving the application service"
+                ></textarea
+                ><button type="submit" id="notes-submit">
+                  Save note <span>&#8599;</span>
+                </button>
+              </div>
+              <p
+                class="form-status"
+                id="notes-message"
+                role="status"
+                aria-live="polite"
+              ></p>
+            </form>
+            <ul id="notes-list" class="entries">
+              <li class="empty">Loading notes...</li>
+            </ul>
+            <footer id="notes-route">Waiting for a request</footer>
+          </article>
+        </section>
+        <section class="explain">
+          <span class="number">&#8635;</span>
+          <div>
+            <h3>Make a failure observable.</h3>
+            <p>
+              Each successful request shows its application pod and database
+              instance. If a write loses its response, use
+              <strong>Retry same request</strong>. The saved request ID prevents
+              a duplicate entry when the original write already committed.
+            </p>
+            <p>
+              Lists show the latest 100 entries. Records are append-only to keep
+              recovery easy to understand. In local demo mode, each service uses
+              its own temporary memory store.
+            </p>
+          </div>
+          <div class="legend">
+            <span
+              ><b class="key green"></b> Ready: service health check
+              passed</span
+            ><span
+              ><b class="key orange"></b> Unavailable: check the failing
+              layer</span
+            ><span>No automatic transaction replay</span>
+          </div>
+        </section>
+      </main>
+      <footer class="page-footer">
+        <span>RAC Lab Board <b>/</b> Learning lab</span
+        ><span
+          >Frontend &rarr; Node.js &rarr; Python / Java &rarr; Oracle RAC</span
+        >
+      </footer>
+    </div>
+  </body>
+</html>

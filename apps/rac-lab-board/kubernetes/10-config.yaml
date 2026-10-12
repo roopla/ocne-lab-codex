@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rac-board-config
+  namespace: rac-app
+  labels:
+    app.kubernetes.io/part-of: rac-lab-board
+data:
+  STORE_MODE: oracle
+  EXPECTED_PDB: LABPDB
+  DB_DSN: (DESCRIPTION=(CONNECT_TIMEOUT=3)(TRANSPORT_CONNECT_TIMEOUT=2)(RETRY_COUNT=0)(ADDRESS_LIST=(LOAD_BALANCE=ON)(FAILOVER=ON)(ADDRESS=(PROTOCOL=TCP)(HOST=racnode1-0-lsnr.rac.svc.cluster.local)(PORT=31522))(ADDRESS=(PROTOCOL=TCP)(HOST=racnode2-0-lsnr.rac.svc.cluster.local)(PORT=31523)))(CONNECT_DATA=(SERVICE_NAME=labpdb_app)))

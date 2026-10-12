@@ -1,0 +1,33 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial", "fontSize": "14px", "primaryColor": "#edf5f1", "primaryTextColor": "#173c32", "primaryBorderColor": "#43816a", "lineColor": "#607c80", "clusterBkg": "#f6f9f8", "clusterBorder": "#c4d5cf"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 35, "rankSpacing": 35, "wrappingWidth": 260}}}%%
+flowchart TB
+  browser["Your browser<br/>localhost:8080"]
+  ssh["SSH tunnel through ocne-cp<br/>worker NodePort 30080"]
+  subgraph cluster["Existing OCNE 1.9 cluster / Kubernetes 1.29"]
+    direction TB
+    subgraph app["NEW namespace: rac-app / proposed only"]
+      frontend["Frontend x2<br/>HTML / CSS / JS - port 8080"]
+      gateway["Node.js gateway x2<br/>Routes + health - port 8081"]
+      python["Python tasks x2 - port 8082<br/>python-oracledb Thin"]
+      java["Java notes x2 - port 8083<br/>JDBC Thin + HikariCP"]
+    end
+    subgraph existing["EXISTING namespace: rac"]
+      l1["racnode1-0-lsnr<br/>port 31522"]
+      l2["racnode2-0-lsnr<br/>port 31523"]
+      r1["RACCDB1 / worker1"]
+      r2["RACCDB2 / worker2"]
+      db[("Shared RACCDB / LABPDB<br/>Service: labpdb_app<br/>LAB_TASKS + LAB_NOTES")]
+    end
+  end
+  browser --> ssh --> frontend --> gateway
+  gateway -->|/api/tasks| python
+  gateway -->|/api/notes| java
+  python --> l1 & l2
+  java --> l1 & l2
+  l1 --> r1
+  l2 --> r2
+  r1 --> db
+  r2 --> db
+  classDef appStyle fill:#e9f4ee,stroke:#43816a,color:#173c32
+  classDef dataStyle fill:#e9eff8,stroke:#577fa4,color:#243c55
+  class frontend,gateway,python,java appStyle
+  class l1,l2,r1,r2,db dataStyle
