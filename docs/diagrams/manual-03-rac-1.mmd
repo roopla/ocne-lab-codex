@@ -1,0 +1,14 @@
+flowchart LR
+ Y["RacDatabase YAML"] --> O["Database Operator"]
+ O --> T1["StatefulSet racnode1"]
+ O --> T2["StatefulSet racnode2"]
+ T1 --> P1["racnode1-0: GI + RACCDB1"]
+ T2 --> P2["racnode2-0: GI + RACCDB2"]
+ H1[("worker1 /scratch: homes + staging")] --> P1
+ H2[("worker2 /scratch: homes + staging")] --> P2
+ P1 <--> A[("Shared ASM DATA: RACCDB + LABPDB")]
+ P2 <--> A
+ P1 <-->|"ens1 / ens2: Multus macvlan"| P2
+ C["SQL client"] --> L["NodePort listener: labpdb_app"]
+ L --> P1
+ L --> P2

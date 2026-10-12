@@ -1,5 +1,9 @@
 # RAC readiness and media inventory
 
+**Current status, 11 October 2026:** RAC is provisioned and SQL/patch/network acceptance passed. This document retains prerequisite-stage evidence; older not-provisioned/pending statements below are historical. For current instructions use the [four-part manual](OCNE-RAC-END-TO-END-MANUAL.md) and [deployment record](RAC-DEPLOYMENT.md). Fresh/live manifests differ because the original service name is immutable. Pod restart/restore acceptance remains unverified.
+
+**Current execution status:** the user authorized RAC provisioning on 10 October at 22:14 EDT, and the manifest has been applied. See [deployment progress and acceptance](RAC-DEPLOYMENT.md). Earlier prerequisite-only statements below describe the handoff before that authorization.
+
 Status on 10 October 2026: host/cluster prerequisites are configured and the gold-home manifest passed server-side dry-run. RAC is not provisioned. CVU container-host validation passed on both workers. The supplied OL9 slim image and both 19.32 home ZIPs are now verified and staged on both workers. The user confirmed DBCA fix 34436514 is unnecessary for the supplied 19.32 home; the prerequisite check is closed; see [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md). See the [manual Bash guide](RAC-PREREQUISITES-GUIDE.md), [user handoff](RAC-PROVISIONING-HANDOFF.md), and [cloning run log](CLONING-RUN-LOG.md).
 
 ## Verified installation media
@@ -34,7 +38,7 @@ Oracle Database Operator tag `2.2.0` resolves to commit `ff6f9178c1650df30afbf20
 
 The cluster runs Kubernetes 1.29.14+2.el9. Cert-manager 1.17 lists Kubernetes 1.29 compatibility, but its community maintenance ended 7 October 2025. The latest observed patch tag is v1.17.4. Currently maintained 1.20/1.21 releases exclude Kubernetes 1.29. Any choice for this fixed OCNE 1.9 lab must record that lifecycle limitation; do not apply the operator README's current cert-manager example without checking compatibility. See the [cert-manager release matrix](https://cert-manager.io/docs/releases/).
 
-Worker preparation now includes shared ASM partitions, isolated Multus networks, 128 GiB scratch filesystems, kernel settings, Oracle's SELinux policy and 3 GiB HugePages per worker. Worker RAM remains 22 GiB each. Final pod resources are 16 GiB ordinary memory plus 3 GiB HugePages and 4 CPUs; the operator enforces the 16 GiB ordinary-memory minimum. This is a constrained lab configuration, not RAC capacity validation. Original NFS/container disks retain their existing roles. CVU 23.26.3.0.0 subsequently passed the Kubernetes container-host check on each worker; [results](RAC-CVU-RESULTS.md).
+Worker preparation now includes shared ASM partitions, isolated Multus networks, 128 GiB scratch filesystems, kernel settings, Oracle's SELinux policy and HugePages disabled on each worker. Worker RAM remains 22 GiB each. Final pod resources are 16 GiB ordinary memory with HugePages disabled and 4 CPUs; the operator enforces the 16 GiB ordinary-memory minimum. This is a constrained lab configuration, not RAC capacity validation. Original NFS/container disks retain their existing roles. CVU 23.26.3.0.0 subsequently passed the Kubernetes container-host check on each worker; [results](RAC-CVU-RESULTS.md).
 
 Windows/VirtualBox shared-disk and NIC orchestration is local implementation. Identify every new disk by its VM attachment, UUID, serial, signatures and mounts before initialization. Do not assume a device letter. Shared ASM requires shared block storage; the existing NFS share is not an ASM block device.
 

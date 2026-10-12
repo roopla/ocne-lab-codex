@@ -1,5 +1,7 @@
 # Manual RAC prerequisite setup on the OCNE 1.9 cloning lab
 
+**Current status, 11 October 2026:** RAC is provisioned and SQL/patch/network acceptance passed. This document retains prerequisite-stage evidence; older not-provisioned/pending statements below are historical. For current instructions use the [four-part manual](OCNE-RAC-END-TO-END-MANUAL.md) and [deployment record](RAC-DEPLOYMENT.md). Fresh/live manifests differ because the original service name is immutable. Pod restart/restore acceptance remains unverified.
+
 This guide records the local Windows/VirtualBox implementation and the Oracle Linux/Kubernetes prerequisites used on 9-10 October 2026. It stops before RAC provisioning. The user supplied an OL9 RAC slim image and 19.32 GI/database gold home ZIPs; these are verified and staged on both workers. The user will apply the database manifest themselves; [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md) records completed checks and their confirmation that DBCA fix 34436514 is unnecessary for this home.
 
 For the complete foundation, first follow [golden VM cloning](OCNE-1.9-Golden-VM-Cloning-Guide.md) and the full [OCNE installation guide](OCNE-1.9-OL9-Setup-Guide.md). Do not substitute Quick Install, olcnectl provision, standalone kubeadm, OCNE2, or fresh ISO scripts02/03. [The run log](CLONING-RUN-LOG.md) records what actually ran; commands below are instructions for a future build, not assertions they have all run again.
@@ -104,7 +106,7 @@ olcnectl module report --environment-name homelab --name rac-multus --children
 
 If the module already exists, inspect its state instead of creating another. On ocne-cp, apply the reviewed [rac-networks.yaml](../config/rac-networks.yaml) and verify the Multus daemonset is 3/3Ready and both NADs exist in rac. They use macvlan bridge mode, host-local IPAM, enp0s8/enp0s9, and subnets192.168.78/24 and192.168.79/24. The operator assigns explicit per-node addresses from rangeStart120; host-local alone does not coordinate allocation across workers. Dedicate these NADs to this RAC cluster.
 
-Run [Test-RAC-Private-Networks.sh](../scripts/Test-RAC-Private-Networks.sh) as labadmin on ocne-cp (it embeds [the test manifest](../config/rac-network-check.yaml)). Its disposable pods use .128/.129 on both networks, NET_RAW for ping, and test both directions with 1472-byte payloads plus Kubernetes DNS. The final test uses node selectors so the scheduler must place each pod with 4CPU,16 GiB ordinary memory and3GiB HugePages requests; it also verifies the HugePages mount and an allowed pod sysctl. Inspect any existing test pods before replacing them. Remove only those named diagnostic pods after success. No RAC pod is created by this test.
+Run [Test-RAC-Private-Networks.sh](../scripts/Test-RAC-Private-Networks.sh) as labadmin on ocne-cp (it embeds [the test manifest](../config/rac-network-check.yaml)). Its disposable pods use .128/.129 on both networks, NET_RAW for ping, and test both directions with 1472-byte payloads plus Kubernetes DNS. The final test uses node selectors so the scheduler must place each pod with 4 CPUs and 16 GiB ordinary memory; it also verifies an allowed pod sysctl. Inspect any existing test pods before replacing them. Remove only those named diagnostic pods after success. No RAC pod is created by this test.
 
 ## 4. Configure each worker's OS
 
@@ -117,10 +119,10 @@ net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1536
+vm.nr_hugepages = 0
 ```
 
-Load with `sysctl -p /etc/sysctl.d/98-ocne-rac.conf`; require1536 pages of 2048KiB (3 GiB). Keep swap disabled. TSC was already selected; verify it rather than blindly changing clocksources. Disable THP with `grubby --update-kernel=ALL --args='transparent_hugepage=never'` and write never to /sys/kernel/mm/transparent_hugepage/enabled. Retain existing boot arguments.
+Load with `sysctl -p /etc/sysctl.d/98-ocne-rac.conf`; require zero reserved HugePages (user request of 11 October 2026). Keep swap disabled. TSC was already selected; verify it rather than blindly changing clocksources. Disable THP with `grubby --update-kernel=ALL --args='transparent_hugepage=never'` and write never to /sys/kernel/mm/transparent_hugepage/enabled. Retain existing boot arguments.
 
 Preserve all existing kubelet arguments while adding `--allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem` to KUBELET_EXTRA_ARGS. This run's original extra argument was --fail-swap-on=false. Run systemctl daemon-reload and restart kubelet. The unsafe-sysctl allowance is Oracle's documented RAC requirement; do not disable SELinux/firewalld.
 
@@ -130,7 +132,7 @@ Create /scratch/rac/cluster01/racnode1 and racnode2 on both workers, owner54321:
 
 Reboot workers one at a time and verify boot IDs changed, all settings survived, private NICs are still PROMISC, original storage is mounted, Chrony synchronized and Kubernetes nodes recovered. [Verify-RAC-Worker.sh](../scripts/Verify-RAC-Worker.sh) performs these prerequisite checks. Check NFS again. Never reboot both workers simultaneously during an active RAC workload without a planned shutdown.
 
-Memory rationale: the operator 2.2.0 webhook requires a16GiB ordinary-memory limit. The lab manifest requests/limits16GiB ordinary memory plus 3GiB HugePages, and4CPUs per worker. SGA3G/PGA2G is the current lab profile. The 3 GiB SGA equals the configured HugePages reservation; actual GI/ASM usage and database allocation must be checked during provisioning. HugePages are separately reserved by Kubernetes; adding them to16GiB gives19GiB, not 16GiB total. We did not enable the development-mode validation bypass or ignore Oracle prerequisite failures. Runtime capacity remains untested until the user provisions RAC.
+Memory rationale: the operator 2.2.0 webhook requires a 16 GiB ordinary-memory limit. Each pod requests/limits 16 GiB ordinary memory and 4 CPUs, with no HugePages resource. SGA remains 3G and PGA 2G. The user requested disabling HugePages after the first DBCA attempt exposed insufficient shared-memory overhead. Pod kernel.shmall is 2097152 (4 KiB pages) and kernel.shmmax is 8589934592 (8 GiB); these are ceilings, not preallocated RAM. THP remains disabled. This constrained lab profile is not production capacity validation. See [actual deployment and recovery](RAC-DEPLOYMENT.md).
 
 ## 5. Install cert-manager and Oracle Database Operator
 
@@ -393,17 +395,17 @@ cp -a /etc/sysconfig/kubelet /etc/default/grub "$backup/"
 grubby --info=ALL > "$backup/grubby-before.txt"
 sysctl fs.file-max net.core.rmem_default net.core.rmem_max net.core.wmem_default net.core.wmem_max fs.aio-max-nr vm.nr_hugepages > "$backup/sysctl-before.txt"
 cat > /etc/sysctl.d/98-ocne-rac.conf <<'SYSCTL'
-# Oracle RAC on OCNE kernel prerequisites; HugePages sized for this lab.
+# Oracle RAC on OCNE kernel prerequisites; HugePages disabled by user request.
 fs.file-max = 6815744
 net.core.rmem_default = 262144
 net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1536
+vm.nr_hugepages = 0
 SYSCTL
 sysctl -p /etc/sysctl.d/98-ocne-rac.conf
-[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 0 ]]
 # Oracle recommends disabling THP; use grubby for OL9 boot entries.
 grubby --update-kernel=ALL --args='transparent_hugepage=never'
 printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled
@@ -487,7 +489,7 @@ python3 - "$secret_dir/db-password.txt" <<'PY'
 import secrets,string,sys
 alphabet=string.ascii_letters+string.digits
 with open(sys.argv[1],'x') as target:
- target.write('Rac_' + ''.join(secrets.choice(alphabet) for _ in range(28)))
+ target.write('Rac_9' + ''.join(secrets.choice(alphabet) for _ in range(19)))
 PY
 openssl genrsa -out "$secret_dir/key.pem" 3072 2>/dev/null
 openssl rsa -in "$secret_dir/key.pem" -out "$secret_dir/key.pub" -pubout 2>/dev/null
@@ -526,7 +528,7 @@ esac
 [[ $(getenforce) == Enforcing ]]
 [[ $(wc -l < /proc/swaps) == 1 ]]
 [[ $(cat /sys/devices/system/clocksource/clocksource0/current_clocksource) == tsc ]]
-[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 0 ]]
 grep -F '[never]' /sys/kernel/mm/transparent_hugepage/enabled
 [[ $(awk '/Hugepagesize:/{print $2}' /proc/meminfo) == 2048 ]]
 grep -F -- '--allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem' /etc/sysconfig/kubelet
@@ -599,36 +601,18 @@ done
 
 The Bash host equivalent has been syntax-checked, not executed as a second provisioning run. Compare every result with the intended inventory and stop on partial state. Do not rerun creation to recover an error. On a Linux VirtualBox host, set VBOX to its installed executable and LAB_ROOT to the intended project directory instead; Windows host inspection/power settings do not apply there.
 
-## Adjusting an already prepared worker to the 3 GiB profile
+## Current memory profile: HugePages disabled
 
-The current manifest uses SGA 3G, PGA 2G, 16Gi ordinary memory and 3Gi HugePages per RAC pod. The new-build commands above already use 1536 two-MiB HugePages. For an existing pre-provisioning lab with the former 1024-page reservation, use [Increase-RAC-HugePages.sh](../scripts/Increase-RAC-HugePages.sh) on one worker at a time. It requires the exact lab hostname/filesystem identity and a completely unused HugePages pool, backs up the configuration, changes only the HugePages line, and restarts kubelet. It must not be used while an active RAC database consumes HugePages.
+On 11 October the user requested disabling HugePages while retaining SGA 3 GiB and PGA 2 GiB. Fresh builds use vm.nr_hugepages=0 and the current manifest omits hugepages-2Mi. Do not run the historical Increase-RAC-HugePages.sh, Adjust-RAC-HugePages.sh or allocation test for this profile.
 
-First, on ocne-cp, confirm there are no RAC resources/pods. From the workstation in Git Bash, copy the scripts through the existing authenticated SSH aliases:
-
-```bash
-ssh ocne-cp 'kubectl get racdatabases -A; kubectl get pods -n rac'
-for node in ocne-w1 ocne-w2; do
-  scp scripts/Increase-RAC-HugePages.sh scripts/Test-RAC-HugePages.sh scripts/Verify-RAC-Worker.sh "$node":/home/labadmin/
-done
-```
-
-On each worker in an interactive SSH session, validate then execute:
+For an already prepared worker, copy and review [Disable-RAC-HugePages.sh](../scripts/Disable-RAC-HugePages.sh), then run on each worker:
 
 ```bash
-bash -n ~/Increase-RAC-HugePages.sh
-sudo bash ~/Increase-RAC-HugePages.sh
-sudo bash ~/Test-RAC-HugePages.sh
-sudo bash ~/Verify-RAC-Worker.sh
-sudo grep -Fx 'vm.nr_hugepages = 1536' /etc/sysctl.d/98-ocne-rac.conf
+sudo bash -n ~/Disable-RAC-HugePages.sh
+sudo bash ~/Disable-RAC-HugePages.sh
+sysctl vm.nr_hugepages
+grep HugePages /proc/meminfo
+cat /sys/kernel/mm/transparent_hugepage/enabled
 ```
 
-The [HugePages allocation test](../scripts/Test-RAC-HugePages.sh) creates its own temporary file under /dev/hugepages, maps and touches the complete 3 GiB pool, then releases it. Its free-page guards prevent running alongside a workload already using HugePages. These checks succeeded on this lab; the changed setting is saved for boot, but no worker reboot was performed in this adjustment.
-
-On ocne-cp, check the first worker recovered before adjusting the second:
-
-```bash
-kubectl wait --for=condition=Ready node/ocne-w1.lab.test --timeout=60s
-kubectl get nodes -o custom-columns=NAME:.metadata.name,MEMORY:.status.allocatable.memory,HUGEPAGES:.status.allocatable.hugepages-2Mi
-```
-
-After both workers advertise 3Gi HugePages, run the updated network/scheduling test, remove only its two named diagnostic pods, copy the final RAC YAML, and run server-side dry-run as documented in the handoff. The diagnostic test uses BusyBox; it does not configure a database. [Kubernetes HugePages documentation](https://kubernetes.io/docs/tasks/manage-hugepages/scheduling-hugepages/) explains allocation and kubelet resource advertisement.
+The guarded helper requires all HugePages to be unused before releasing the pool, backs up sysctl.d and persists zero. The live deployment needed additional recovery because Clusterware was already configured; see [deployment recovery](RAC-DEPLOYMENT.md). Do not restart or recreate its pods as a routine prerequisite step.

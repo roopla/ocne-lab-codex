@@ -133,7 +133,7 @@ This is host-level NFS. No Kubernetes PV/PVC, storage provisioner or shared ASM 
 | Shutdown | Workers/control plane off before operator |
 | Availability | Single Windows host and single control plane; NFS depends on the operator |
 | Preserved source | ol9-golden stays powered off during normal lab operation |
-| Current RAC phase | Operator, Multus, shared ASM partitions and worker prerequisites prepared; user-supplied image/gold homes verified and staged; RAC provisioning pending |
+| Current RAC phase | RAC provisioned and SQL/patch/network checks passed11October; pod-restart prechecks found missing GI recovery directories; disruptive recovery remains untested |
 
 Return to [Operating the lab](OPERATING-LAB.md) for commands and checks, or [the detailed run log](CLONING-RUN-LOG.md) for evidence. The [installation guide](OCNE-1.9-OL9-Setup-Guide.md) retains the Oracle sources and original procedure. These diagrams document this lab's local Windows/VirtualBox implementation, not an Oracle certification statement.
 
@@ -143,26 +143,26 @@ Edit the Mermaid blocks in this file and the overview in [README](../README.md).
 
 ## RAC prerequisites added on 9-10 October
 
-The foundation diagrams above retain the original seven-disk baseline. The current additions below are installed prerequisites; dashed RAC nodes remain **unprovisioned** and will be created by the user later.
+The foundation diagrams above retain the original seven-disk baseline. The additions below are installed, and both RAC instances are OPEN. Read [deployment acceptance](RAC-DEPLOYMENT.md) and the [scenario workbook](RAC-POD-EXERCISES.md) for verified results and recovery limits.
 
 ```mermaid
 flowchart TB
     OPERATOR["Database Operator 2.2.0<br/>Kubernetes controller + cert-manager"]
     subgraph WORKER1["ocne-w1 - 22 GiB / 6 vCPUs"]
         S1[("128 GiB scratch<br/>/scratch - XFS")]
-        P1["Future racnode1 pod<br/>16 GiB memory + 3 GiB HugePages<br/>4 CPUs - not provisioned"]
+        P1["racnode1 pod<br/>16 GiB memory - HugePages disabled<br/>4 CPUs - RACCDB OPEN"]
     end
     subgraph WORKER2["ocne-w2 - 22 GiB / 6 vCPUs"]
         S2[("128 GiB scratch<br/>/scratch - XFS")]
-        P2["Future racnode2 pod<br/>16 GiB memory + 3 GiB HugePages<br/>4 CPUs - not provisioned"]
+        P2["racnode2 pod<br/>16 GiB memory - HugePages disabled<br/>4 CPUs - RACCDB OPEN"]
     end
-    ASM[("Shared ASM01 + ASM02<br/>2 x 50 GiB fixed/shareable VDI<br/>GPT partitions; no ASM disk group yet")]
+    ASM[("Shared ASM01 + ASM02<br/>2 x 50 GiB fixed/shareable VDI<br/>ASM DATA mounted - EXTERNAL redundancy")]
     N1["Private1 - 192.168.78.0/24<br/>VirtualBox intnet + Multus macvlan"]
     N2["Private2 - 192.168.79.0/24<br/>VirtualBox intnet + Multus macvlan"]
-    OPERATOR -.-> P1
-    OPERATOR -.-> P2
-    P1 -.-> S1
-    P2 -.-> S2
+    OPERATOR --> P1
+    OPERATOR --> P2
+    P1 --> S1
+    P2 --> S2
     WORKER1 --- ASM
     WORKER2 --- ASM
     WORKER1 --- N1
@@ -171,7 +171,7 @@ flowchart TB
     WORKER2 --- N2
     classDef future fill:#f8fafc,stroke:#64748b,stroke-dasharray:5 5
     classDef installed fill:#ecfdf5,stroke:#059669,color:#064e3b
-    class P1,P2 future
+    class P1,P2 installed
     class S1,S2,ASM,N1,N2,OPERATOR installed
 ```
 

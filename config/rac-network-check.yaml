@@ -25,30 +25,21 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
-    volumeMounts:
-    - name: hugepages
-      mountPath: /hugepages
   nodeSelector:
     kubernetes.io/hostname: ocne-w1.lab.test
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '3221225472'
+      value: '8589934592'
     - name: kernel.shmall
-      value: '786432'
+      value: '2097152'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
       value: '2'
-  volumes:
-  - name: hugepages
-    emptyDir:
-      medium: HugePages
 ---
 apiVersion: v1
 kind: Pod
@@ -77,27 +68,18 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
-    volumeMounts:
-    - name: hugepages
-      mountPath: /hugepages
   nodeSelector:
     kubernetes.io/hostname: ocne-w2.lab.test
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '3221225472'
+      value: '8589934592'
     - name: kernel.shmall
-      value: '786432'
+      value: '2097152'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
       value: '2'
-  volumes:
-  - name: hugepages
-    emptyDir:
-      medium: HugePages

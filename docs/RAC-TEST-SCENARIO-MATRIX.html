@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RAC test scenarios: commands, expected output and actual results</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body class="scenario-matrix"><main>
+<!-- Source SHA256: ac4e6fe16b120d291bdcd929799268611ea55763d25ce02f90c55407d6077abf; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="RAC-TEST-SCENARIO-MATRIX.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="rac-test-scenarios-commands-expected-output-and-actual-results">RAC test scenarios: commands, expected output and actual results</h1>
+<p><a href="OCNE-RAC-END-TO-END-MANUAL.html">Manual start</a> | <a href="RAC-POD-EXERCISES.html">Detailed workbook and recovery instructions</a></p>
+<p><strong>Evidence cutoff: 12 October 2026, 11:44 UTC / 07:44 EDT.</strong> The table covers all28 workbook scenarios. PASS applies only to the scope stated; an observed healthy state is not a fault-injection pass. Commands are copyable Bash equivalents, not a script to run all rows together. Maintenance rows interrupt sessions and require the workbook?s backup/survivor checks. Follow the complete sequence there, including recovery. Expected output describes the acceptance criterion; actual output is linked in full and includes failed attempts.</p>
+<h2 id="command-context-and-reusable-helpers">Command context and reusable helpers</h2>
+<p>Log into <strong>ocne-cp as labadmin</strong>, with its existing kubectl access. Paste these local shell functions once; they install nothing. <code>srv 1 ...</code> runs the DB-home SRVCTL on pod1, <code>gi 2 ...</code> runs CRSCTL on pod2. The functions preserve argument quoting.</p>
+<pre><code class="language-bash">srv() {
+  local n=$1 command
+  shift
+  [[ &quot;$n&quot; == 1 || &quot;$n&quot; == 2 ]] || return 2
+  printf -v command '%q ' /u01/app/oracle/product/19c/dbhome_1/bin/srvctl &quot;$@&quot;
+  kubectl exec -n rac &quot;racnode$n-0&quot; -- su - oracle -c &quot;$command&quot;
+}
+gi() {
+  local n=$1
+  shift
+  [[ &quot;$n&quot; == 1 || &quot;$n&quot; == 2 ]] || return 2
+  kubectl exec -n rac &quot;racnode$n-0&quot; -- /u01/app/19c/grid/bin/crsctl &quot;$@&quot;
+}
+sqlnet() {
+  local n=$1 host port
+  [[ &quot;$n&quot; == 1 || &quot;$n&quot; == 2 ]] || return 2
+  host=192.168.77.$((11+n))
+  port=$((31521+n))
+  kubectl exec -it -n rac racnode1-0 -- su - oracle -c &quot;/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -L system@//$host:$port/labpdb_app&quot;
+}
+</code></pre>
+<p><code>sqlnet</code> prompts securely for the SYSTEM password. At SQL&gt;, run the following, verify the intended instance, then <code>exit</code> before starting the second connection. During a pod1 outage, run the client in surviving racnode2-0 instead by changing the client pod in the function; during instance-only outages its pod remains usable.</p>
+<pre><code class="language-sql">select sys_context('USERENV','CON_NAME') as pdb,
+       sys_context('USERENV','INSTANCE_NAME') as instance_name from dual;
+exit
+</code></pre>
+<p>Expected/observed identity: LABPDB/RACCDB1 through31522; LABPDB/RACCDB2 through31523. The automated captures passed passwords on protected stdin and asserted these identities; no password appears in the commands or transcripts.</p>
+<h2 id="scenario-matrix">Scenario matrix</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Scenario / purpose</th>
+<th>Corresponding command syntax</th>
+<th>Expected result / output</th>
+<th>Actual result / output evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S01</td>
+<td>Node/pod identity, ownership, placement and resources</td>
+<td><code>kubectl get nodes -o wide</code><br><code>kubectl -n rac get pods -o wide</code><br><code>kubectl -n rac get statefulsets</code></td>
+<td>Three Ready nodes; one RAC pod on each intended worker; StatefulSets 1/1.</td>
+<td>PASS. Both workers Ready/schedulable; pods1/1 Running. New UIDs after replacement, restartCount 0. Final resources 4 CPU/16 Gi each, no hugepages request. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S02</td>
+<td>Service and endpoint routing</td>
+<td><code>kubectl -n rac get services,endpointslices -o wide</code></td>
+<td>Services select intended pods; endpoints follow replacements.</td>
+<td>PASS for observed routing and both NodePort SQL paths. SCAN 31521 selects node 1 only; a fully redundant SCAN route was not proven. <a href="RAC-EXERCISE-BASELINE-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S03</td>
+<td>Grid Infrastructure, ASM, database, patches and memory</td>
+<td><code>gi 1 check crs</code><br><code>gi 2 check crs</code><br><code>gi 1 stat res -t</code><br><code>srv 1 status database -db RACCDB -verbose</code></td>
+<td>Both CRS stacks online; DATA mounted; two OPEN instances, LABPDB READ WRITE; RU 19.32; SGA 3 GiB and HugePages FALSE.</td>
+<td>PASS. Final full verification: DATA MOUNTED/EXTERN, offline disks 0; RU 39472050/OJVM 39222882 SQL SUCCESS; no invalid registry components. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S04</td>
+<td>Connect through each worker listener</td>
+<td><code>sqlnet 1</code><br><code>sqlnet 2</code></td>
+<td>Prompt for password; SQL identity must be LABPDB and RACCDB1/RACCDB2 respectively.</td>
+<td>PASS. TCP from control plane and network SQL from a RAC pod passed through .12:31522 and .13:31523. Rechecked 12October 11:44 UTC. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S05</td>
+<td>Stop/start instance 1, verify survivor 2</td>
+<td><code>srv 1 stop service -db RACCDB -service labpdb_app -instance RACCDB1</code><br><code>srv 1 stop instance -db RACCDB -instance RACCDB1 -stopoption IMMEDIATE</code><br><code>srv 2 status database -db RACCDB -verbose</code><br><code>srv 1 start instance -db RACCDB -instance RACCDB1</code></td>
+<td>Only instance 1 stops; fresh SQL connection to instance 2 works; instance 1/service return.</td>
+<td>PASS after correction. Instance-only stop initially failed CRS-2974 due service dependency. Stop-service first worked. Restart automatically restored service; redundant manual start returned already-running. Both recovered. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S06</td>
+<td>Stop/start instance 2, verify survivor 1</td>
+<td><code>srv 2 stop service -db RACCDB -service labpdb_app -instance RACCDB2</code><br><code>srv 2 stop instance -db RACCDB -instance RACCDB2 -stopoption IMMEDIATE</code><br><code>srv 1 status database -db RACCDB -verbose</code><br><code>srv 2 start instance -db RACCDB -instance RACCDB2</code></td>
+<td>Mirror S05; instance 1 remains available.</td>
+<td>PASS. Instance2 was not running while SQL to LABPDB/RACCDB1 succeeded; instance 2 then OPEN/ACTIVE and service on both. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S07</td>
+<td>Delete/recreate pod 1 after peer recovery</td>
+<td><code>kubectl -n rac delete pod racnode1-0 --grace-period=120 --wait=true --timeout=300s</code><br><code>kubectl -n rac wait --for=condition=Ready pod/racnode1-0 --timeout=900s</code></td>
+<td>Same name/new UID; correct persistent home/storage; CRS/ASM/database and SQL recover. Readiness alone insufficient.</td>
+<td>RECOVERED WITH STARTUP DEFECT. New UID 590e8b8f-3a93-43d1-a8ea-3549e6b83201, IP 10.244.1.11. Prepared backup restored automatically; duplicate CRS start caused CRS-4640/INS-40401. Existing DB still recovered; both SQL paths passed 00:02 UTC. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S08</td>
+<td>Delete/recreate pod 2 before pod 1</td>
+<td><code>kubectl -n rac delete pod racnode2-0 --grace-period=120 --wait=true --timeout=300s</code><br><code>kubectl -n rac wait --for=condition=Ready pod/racnode2-0 --timeout=900s</code></td>
+<td>Same name/new UID; node-local GI files must remain usable by new container.</td>
+<td>RECOVERED WITH ASSISTANCE. New UIDe5fb5f48-cfcc-4476-97d9-07338262095d, IP 10.244.2.10. Old SELinux MCS label blocked backup copy. Targeted restorecon plus GI OS-file restoration/startup recovered it. Not an unattended-recovery pass. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S09</td>
+<td>Container restart versus pod replacement</td>
+<td><code>kubectl -n rac get pod racnode1-0 -o jsonpath='{.metadata.uid}{"\n"}{.status.containerStatuses[*].restartCount}{"\n"}'</code></td>
+<td>Container restart keeps UID and increments restartCount; replacement changes UID.</td>
+<td>OBSERVATION ONLY. Replacement UIDs changed; restartCount 0 on new pods. No deliberate container crash injected, pending image startup correction. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S10</td>
+<td>Stop/start only application service on instance 1</td>
+<td><code>srv 1 stop service -db RACCDB -service labpdb_app -instance RACCDB1</code><br><code>srv 2 status service -db RACCDB</code><br><code>srv 1 start service -db RACCDB -service labpdb_app -instance RACCDB1</code></td>
+<td>Service absent on 1, available on 2; restore returns it on both.</td>
+<td>PASS for service maintenance. SQL to LABPDB/RACCDB2 passed during outage; pods stayed Ready. A separate listener-stop fault was not injected. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S11</td>
+<td>Compare pod readiness with Oracle readiness</td>
+<td><code>kubectl -n rac get pods</code><br><code>srv 1 status database -db RACCDB -verbose</code></td>
+<td>TCP readiness can remain true while DB/service is unavailable; verify SQL separately.</td>
+<td>OBSERVED. Both pods stayed1/1 Ready during instance/service stops. After pod 2 recovery, Ready preceded two-instance SQL acceptance; initial SQL assertion failed then later passed. No liveness probe exists. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S12</td>
+<td>Cordon/uncordon each worker</td>
+<td><code>kubectl cordon ocne-w1.lab.test</code><br><code>kubectl get node ocne-w1.lab.test</code><br><code>kubectl uncordon ocne-w1.lab.test</code></td>
+<td>SchedulingDisabled while cordoned; running pods remain; uncordon restores scheduling.</td>
+<td>PASS on both workers sequentially. Ready,SchedulingDisabled then Ready; RAC pods stayed running; final SQL healthy. Repeat syntax with ocne-w2.lab.test. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S13</td>
+<td>Worker reboot/NotReady and host-local homes</td>
+<td><code>kubectl get nodes</code><br><code>kubectl -n rac describe pod racnode1-0</code></td>
+<td>A reboot interrupts that instance; correct local home and ASM must return.</td>
+<td>NOT INJECTED after RAC. Node readiness/affinity captured. Reboot deferred until image restart path is corrected; chapter4 covers recovery order. <a href="RAC-EXERCISE-BASELINE-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S14</td>
+<td>Scheduling/resource shortage</td>
+<td><code>kubectl describe node ocne-w1.lab.test</code><br><code>kubectl -n rac get events --sort-by=.metadata.creationTimestamp</code></td>
+<td>Events identify insufficient CPU/memory or affinity; never shrink requirements blindly.</td>
+<td>OBSERVED resources and successful replacement scheduling. Earlier HugePages/IPC provisioning failure documented. No intentional OOM/resource-exhaustion fault. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S15</td>
+<td>Image availability / ImagePullBackOff</td>
+<td><code>kubectl -n rac describe pod racnode1-0</code><br><code>kubectl -n rac get events --sort-by=.metadata.creationTimestamp</code></td>
+<td>Pinned image cached locally or pull succeeds; failures surface in Events.</td>
+<td>CACHE PATH VERIFIED. Replacement events report pinned image already present. No registry outage or bad-image mutation injected. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S16</td>
+<td>Secrets / installer password validity</td>
+<td><code>kubectl -n rac get secret rac-db-password -o name</code></td>
+<td>Secret exists and password meets installer constraints; never print payload.</td>
+<td>REAL INCIDENT FIXED during provisioning. INS-30003 from32-character credential; regenerated24-character credential before GI/DB creation. No live Secret deletion test. <a href="RAC-DEPLOYMENT.md">Full output</a>.</td>
+</tr>
+<tr>
+<td>S17</td>
+<td>Private CNI/interconnect reachability</td>
+<td><code>kubectl exec -n rac racnode1-0 -- ip -4 address show</code><br><code>kubectl exec -n rac racnode2-0 -- ip -4 address show</code></td>
+<td>Both .78/.79 interfaces present with unique addresses; peer reachability.</td>
+<td>HEALTHY BASELINE and replacement attachments observed. Prior VBox/NM promiscuous-mode fix documented. No deliberate interconnect partition or failover-under-load test. <a href="RAC-EXERCISE-BASELINE-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S18</td>
+<td>DNS/client-route troubleshooting</td>
+<td><code>kubectl exec -n rac racnode1-0 -- getent hosts racnode-scan</code><br><code>kubectl -n rac get services,endpointslices</code></td>
+<td>Service DNS resolves inside cluster; client has an actual route/tunnel to listener.</td>
+<td>DNS/network baseline and NodePort connections verified. Windows hosts file alone is not a route; Windows SQL Developer session not claimed. No DNS outage injected. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S19</td>
+<td>Scratch/home persistence and GI recovery copy</td>
+<td><code>kubectl exec -n rac racnode1-0 -- findmnt -T /u01</code><br><code>kubectl exec -n rac racnode2-0 -- ls -ldZ /u01/app/grid/.etcoraclebackup/oracle</code></td>
+<td>Correct persistent XFS homes; own-node GI files readable after replacement.</td>
+<td>REAL GAPS FIXED. Missing /etc/oracle backups created; old MCS labels corrected on both workers. Homes persisted across both replacements. No scratch filesystem removal/fill test. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S20</td>
+<td>ASM/PV/PVC availability and disk-loss diagnosis</td>
+<td><code>kubectl -n rac get pvc</code><br><code>kubectl get pv</code><br><code>gi 1 stat res -t</code></td>
+<td>Block claims Bound/Retain; ASM DATA mounted; no offline disks.</td>
+<td>HEALTHY STATE VERIFIED. Both block mappings survived replacement. NO disk-removal/corruption injection: EXTERNAL redundancy has no ASM mirror. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S21</td>
+<td>Restart Database Operator only</td>
+<td><code>kubectl -n oracle-database-operator-system rollout restart deployment/oracle-database-operator-controller-manager</code><br><code>kubectl -n oracle-database-operator-system rollout status deployment/oracle-database-operator-controller-manager --timeout=120s</code></td>
+<td>New controller ready; RAC pods and database remain running.</td>
+<td>PASS. New controller pod ready; both RAC UIDs unchanged; both SQL paths passed before/after. Prolonged webhook/API outage not tested. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S22</td>
+<td>Kubernetes API/control-plane outage</td>
+<td><code>kubectl get --raw=/readyz</code><br><code>kubectl get nodes</code></td>
+<td>Healthy API responds; an API outage blocks management, not necessarily running DB processes.</td>
+<td>NOT INJECTED. API was usable throughout captures; exact /readyz command is a diagnostic example, not a captured test. No fault-test output exists.</td>
+</tr>
+<tr>
+<td>S23</td>
+<td>Whole database stop/start</td>
+<td><code>srv 1 stop service -db RACCDB -service labpdb_app</code><br><code>srv 1 stop database -db RACCDB -stopoption IMMEDIATE</code><br><code>srv 1 start database -db RACCDB</code><br><code>srv 1 status service -db RACCDB</code></td>
+<td>Planned outage; both instances reopen and intended memory settings apply.</td>
+<td>EXECUTED during11 October memory correction; subsequent SQL acceptance passed USE_LARGE_PAGES=FALSE/SGA 3 GiB. Not re-injected during the later workbook run. Check service status before any extra start. <a href="RAC-DEPLOYMENT.md">Full output</a>.</td>
+</tr>
+<tr>
+<td>S24</td>
+<td>Full lab shutdown/startup</td>
+<td><code>srv 1 status database -db RACCDB -verbose</code><br><code>kubectl get nodes</code></td>
+<td>Coordinate DB/GI, workers, control plane and NFS; verify time/storage before startup.</td>
+<td>NOT TESTED after RAC. OCNE-only ordered VM restart passed 1 October. Diagnostic commands here do not shut down anything. No fault-test output exists.</td>
+</tr>
+<tr>
+<td>S25</td>
+<td>RMAN backup plus validation versus actual restore</td>
+<td><code>kubectl exec -it -n rac racnode1-0 -- su - oracle</code></td>
+<td>RMAN backup completes; RESTORE DATABASE VALIDATE reads pieces. An actual restore needs separate execution/evidence.</td>
+<td>PASS for database+archivelog, controlfile, SPFILE backup and read validation; exit 0,11October 23:39 UTC. Actual restore/PITR NOT TESTED. Backup is on worker 1 scratch, not an off-host DR copy. Full RMAN command block below. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S26</td>
+<td>OnDelete template/resource adoption</td>
+<td><code>kubectl -n rac get statefulsets -o custom-columns='NAME:.metadata.name,STRATEGY:.spec.updateStrategy.type'</code><br><code>kubectl -n rac get pods -o json</code></td>
+<td>OnDelete leaves existing pods unchanged; replacement adopts new template.</td>
+<td>PASS BY OBSERVATION. Both replacements now request/limit4 CPU and 16 Gi ordinary memory, no hugepages-2Mi; SQL remains FALSE. <a href="RAC-EXERCISE-FINAL-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S27</td>
+<td>New-connection survivor access versus session/transaction failover</td>
+<td><code>sqlnet 1</code><br><code>sqlnet 2</code><br><code>srv 1 config service -db RACCDB -service labpdb_app</code></td>
+<td>New connection can use survivor; replay needs explicit client/service configuration and a workload test.</td>
+<td>PARTIAL. Fresh survivor SQL passed in both instance-stop tests. TAF NONE; no existing-session continuity, transaction replay, committed-marker or rollback workload tested. <a href="RAC-EXERCISE-RECOVERY-OUTPUT.html">Full output</a>.</td>
+</tr>
+<tr>
+<td>S28</td>
+<td>Termination and force-deletion diagnosis</td>
+<td><code>kubectl -n rac describe pod racnode1-0</code><br><code>kubectl -n rac get events --sort-by=.metadata.creationTimestamp</code></td>
+<td>Normal termination completes before replacement; stuck/fenced state needs investigation.</td>
+<td>NORMAL TERMINATION OBSERVED with 120-second grace on both pods. No stuck-node/finalizer fault or force delete used. Each replacement had a new UID. <a href="RAC-EXERCISE-PODS-OUTPUT.html">Full output</a>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="exact-rman-syntax-for-s25">Exact RMAN syntax for S25</h2>
+<p>The destination was created on persistent /u01 with oracle ownership/mode0700 and checked for capacity. In the oracle shell, set the node1 SID, start RMAN with OS authentication and run:</p>
+<pre><code class="language-bash">export ORACLE_SID=RACCDB1
+/u01/app/oracle/product/19c/dbhome_1/bin/rman target /
+</code></pre>
+<pre><code class="language-text">run {
+ allocate channel c1 device type disk format '/u01/app/oracle/recovery-backups/manual-exercises-20261011/%U.bkp' maxpiecesize 8G;
+ backup database plus archivelog;
+ backup current controlfile;
+ backup spfile;
+ restore database validate;
+ release channel c1;
+}
+list backup summary;
+exit;
+</code></pre>
+<p>The existing directory contains the recorded backup; use a new run directory for another backup, following <a href="RAC-POD-EXERCISES.html#s23-s26-planned-outages-backups-and-template-updates">the guarded preparation steps</a>. The full RMAN output shows successful database-piece validation and <code>Recovery Manager complete</code>; the launcher recorded exit0. The phrase ?Finished restore? in this log belongs to RESTORE VALIDATE and does not establish an actual restored database.</p>
+<h2 id="failure-and-correction-table">Failure and correction table</h2>
+<table>
+<thead>
+<tr>
+<th>Observed failure</th>
+<th>Expected handling</th>
+<th>What was actually changed / result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Missing persistent GI /etc/oracle recovery copy</td>
+<td>Stop before destroying the container; preserve each node?s own configured files</td>
+<td>Created own-node backup under /u01/app/grid/.etcoraclebackup/oracle and verified OCR/OLR pointers</td>
+</tr>
+<tr>
+<td>CRS-2974 on instance-only stop</td>
+<td>Account for dependent application service</td>
+<td>Stopped labpdb_app on that instance first, then instance stop succeeded</td>
+</tr>
+<tr>
+<td>PRCR-1120 / CRS-5702 after instance start</td>
+<td>Check whether service already auto-started</td>
+<td>Replaced unconditional service start with status check; both services were already running</td>
+</tr>
+<tr>
+<td>Permission denied restoring node2 GI copy</td>
+<td>Check SELinux labels as well as Unix mode/owner</td>
+<td>cp -a retained old MCS categories; worker-side restorecon restored established container_file_t:s0 policy; SELinux remained Enforcing</td>
+</tr>
+<tr>
+<td>Node2 no configured CRS after failed copy</td>
+<td>Restore only its own verified configuration and OS integration</td>
+<td>Copied into verified empty /etc/oracle; rootcrs.sh -updateosfiles, orainstRoot.sh, crsctl start crs; full acceptance passed</td>
+</tr>
+<tr>
+<td>Pod Ready before database recovered</td>
+<td>Wait for Oracle/SQL separately</td>
+<td>First immediate SQL assertion failed; later ASM mount/DB open completed and full verification passed</td>
+</tr>
+<tr>
+<td>Node1 duplicate CRS start, then INS-40401</td>
+<td>Already-active CRS must not trigger fresh installation</td>
+<td>Database recovered and passed SQL; did not deinstall or recreate GI. <strong>Image logic defect remains</strong>; future image correction/retest needed</td>
+</tr>
+<tr>
+<td>CR briefly showed AVAILABLE with Pending DB fields</td>
+<td>Cross-check live CRS/SQL; allow controller refresh</td>
+<td>Next-morning CR returned OPEN/PRIMARY/19.32. Legacy ORCLPDB connect-string text still stale; use verified LABPDB/labpdb_app</td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="MANUAL-04-RAC-OPERATIONS.html#4c-troubleshooting-from-the-actual-run">all setup incidents</a> for the earlier cloning, networking, certificate, HugePages, PDB and service-name problems. The source manual/workbook links primary Oracle and Kubernetes references and distinguishes local lab implementation.</p>
+</main></body></html>

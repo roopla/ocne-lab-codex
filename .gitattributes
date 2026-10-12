@@ -12,3 +12,5 @@
 *.conf text eol=lf
 .gitignore text eol=lf
 .gitattributes text eol=lf
+*.mmd text eol=lf
+*.svg text eol=lf

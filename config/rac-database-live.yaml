@@ -1,0 +1,93 @@
+# Existing rac19c only: retain immutable legacy service metadata.
+# The actual application service labpdb_app is managed with SRVCTL; see deployment notes.
+# Verified OL9 slim image and user-provided 19.32 gold ZIPs are staged on both workers.
+# No RU, OPatch, or one-off patch application is configured during provisioning.
+apiVersion: database.oracle.com/v4
+kind: RacDatabase
+metadata:
+  name: rac19c
+  namespace: rac
+spec:
+  instanceDetails:
+    nodeCount: 2
+    racHostSwLocation: /scratch/rac/cluster01
+    racNodeName: racnode
+    baseOnsTargetPort: 30200
+    baseLsnrTargetPort: 31522
+    privateIPDetails:
+      - name: macvlan-conf1
+        interface: ens1
+      - name: macvlan-conf2
+        interface: ens2
+    workerNodeSelector:
+      raccluster: raccluster01
+  # Immutable digest verified in CRI-O on both workers.
+  image: docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d
+  imagePullPolicy: IfNotPresent
+  # For a private registry, create the registry secret and set imagePullSecret.
+  sshKeySecret:
+    name: rac-ssh-key
+    privKeySecretName: ssh-privkey
+    pubKeySecretName: ssh-pubkey
+  dbSecret:
+    name: rac-db-password
+    keyFileName: key.pem
+    pwdFileName: pwdfile.enc
+    encryptionType: pkeyutl
+    pkeyopt: rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256
+  asmDiskGroupDetails:
+    - name: DATA
+      redundancy: EXTERNAL
+      type: CRSDG
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm01
+        - /dev/disk/by-partlabel/ocne-rac-asm02
+  scanSvcName: racnode-scan
+  scanSvcTargetPort: 31521
+  serviceDetails:
+    name: labpdb
+  envVars:
+    # Image 19.3.0-slim reads ORACLE_PDB_NAME; operator emits ORACLE_PDB.
+    - name: ORACLE_PDB_NAME
+      value: LABPDB
+    - name: LOG_DIR
+      value: /tmp/orod
+    - name: TOTAL_MEMORY
+      value: '16384'
+  # Per pod: 16 GiB ordinary memory; HugePages disabled by user request, 4 of 6 worker CPUs.
+  # This is a constrained lab profile, not validated RAC workload capacity.
+  resources:
+    requests:
+      cpu: '4'
+      memory: 16Gi
+    limits:
+      cpu: '4'
+      memory: 16Gi
+  securityContext:
+    sysctls:
+      - name: kernel.shmall
+        value: '2097152'
+      - name: kernel.shmmax
+        value: '8589934592'
+      - name: kernel.shmmni
+        value: '4096'
+      - name: kernel.sem
+        value: '250 32000 100 128'
+      - name: net.ipv4.conf.all.rp_filter
+        value: '2'
+  configParams:
+    gridHome: /u01/app/19c/grid
+    gridBase: /u01/app/grid
+    dbHome: /u01/app/oracle/product/19c/dbhome_1
+    dbBase: /u01/app/oracle
+    inventory: /u01/app/oraInventory
+    # Expected filenames; update these if your supplied ZIPs use other names.
+    gridSwZipFile: oracle-gridhome-19.32.zip
+    dbSwZipFile: oracle-dbhome-19.32.zip
+    hostSwStageLocation: /scratch/software/stage/19c/19.32-gold
+    sgaSize: 3G
+    pgaSize: 2G
+    processes: 500
+    cpuCount: 4
+    dbName: RACCDB
+    pdbName: LABPDB

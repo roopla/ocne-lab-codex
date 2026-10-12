@@ -1,5 +1,9 @@
 # RAC image and gold-home acceptance — 10 October 2026
 
+**Current status, 11 October 2026:** RAC is provisioned and SQL/patch/network acceptance passed. This document retains prerequisite-stage evidence; older not-provisioned/pending statements below are historical. For current instructions use the [four-part manual](OCNE-RAC-END-TO-END-MANUAL.md) and [deployment record](RAC-DEPLOYMENT.md). Fresh/live manifests differ because the original service name is immutable. Pod restart/restore acceptance remains unverified.
+
+**Current execution status:** the user authorized RAC provisioning on 10 October at 22:14 EDT, and the manifest has been applied. See [deployment progress and acceptance](RAC-DEPLOYMENT.md). Earlier prerequisite-only statements below describe the handoff before that authorization.
+
 The supplied artifacts are staged on both workers. The final [RAC YAML](../config/rac-database.yaml) passed server-side create dry-run at 21:39 EDT. RAC has not been provisioned; no RacDatabase, PV or rac PVC exists. **Prerequisite checks are complete: the user confirmed at 21:56 EDT that DBCA fix 34436514 is unnecessary for the supplied 19.32 home.**
 
 ## Image

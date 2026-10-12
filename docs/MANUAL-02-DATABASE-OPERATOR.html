@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>2. Install Oracle Database Operator</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: 57f8837579aad68f8d2abe766c72d121d4c688b0de590e8b4f0072b94a22afa4; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="MANUAL-02-DATABASE-OPERATOR.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="2-install-oracle-database-operator">2. Install Oracle Database Operator</h1>
+<p><a href="OCNE-RAC-END-TO-END-MANUAL.html">Manual start</a> | Previous: <a href="MANUAL-01-OCNE.html">1. OCNE</a> | Next: <a href="MANUAL-03-RAC.html">3. RAC</a></p>
+<h2 id="2a-prerequisites-for-installing-oracle-database-operator">2a. Prerequisites for installing Oracle Database Operator</h2>
+<h3 id="2a1-understand-what-this-stage-creates">2a.1 Understand what this stage creates</h3>
+<p>Installing Database Operator adds Kubernetes API types, permissions, a controller and its admission webhook. It does not create a database. <code>cert-manager</code> supplies the controller's TLS certificates. RBAC grants the controller the permissions it needs to observe nodes, networks and manage RAC volumes. The operator's Linux VM from chapter 1 and this Kubernetes operator are different components.</p>
+<img class="diagram" src="diagrams/manual-02-database-operator-1.svg" alt="MANUAL-02-DATABASE-OPERATOR diagram 1"><details><summary>Mermaid diagram source</summary><pre><code class="language-mermaid">sequenceDiagram
+ participant U as Administrator / kubectl
+ participant K as Kubernetes API
+ participant M as cert-manager
+ participant O as Database Operator
+ U-&gt;&gt;K: Install cert-manager and CRDs
+ U-&gt;&gt;K: Install namespace RBAC and RAC permissions
+ U-&gt;&gt;K: Install operator Deployment and Certificate objects
+ M-&gt;&gt;K: Issue TLS Secrets and inject trust bundles
+ O-&gt;&gt;K: Watch rac and operator namespace
+ U-&gt;&gt;K: Verify controller, webhook and CRD
+ Note over U,O: No RacDatabase object created in chapter 2
+</code></pre></details>
+<h3 id="2a2-verify-kubernetes-and-your-administrative-access">2a.2 Verify Kubernetes and your administrative access</h3>
+<p><strong>Run on ocne-cp as labadmin:</strong></p>
+<pre><code class="language-bash">export KUBECONFIG=&quot;$HOME/.kube/config&quot;
+chmod 600 &quot;$KUBECONFIG&quot;
+kubectl config current-context
+kubectl cluster-info
+kubectl get nodes -o wide
+kubectl get pods -A -o wide
+kubectl get deployments -A
+kubectl auth can-i create customresourcedefinitions.apiextensions.k8s.io
+kubectl auth can-i create clusterroles.rbac.authorization.k8s.io
+kubectl auth can-i create namespaces
+kubectl get ns cert-manager oracle-database-operator-system rac
+</code></pre>
+<p>Expected: three Ready nodes, healthy system workloads and <code>yes</code> for all required permissions. The last command returns NotFound for namespaces on a fresh build; that is inventory, not installation failure. If an operator is already installed, inspect its version/watch scope/RBAC rather than installing a second instance. Do not copy administrator kubeconfig into Git or public output.</p>
+<p>Worker image downloads require registry/DNS/HTTPS access; the control plane needs image access for cert-manager as scheduled. Check time on all guests (<code>date -u</code>, <code>chronyc tracking</code>) before diagnosing webhook certificate failures. Confirm actual available CPU/memory (<code>free -h</code>, <code>kubectl describe nodes</code>) rather than relying only on requested VM RAM.</p>
+<h3 id="2a3-select-the-pinned-compatible-assets">2a.3 Select the pinned compatible assets</h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Value used in this manual</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kubernetes</td>
+<td>1.29.14+2.el9</td>
+<td>Installed by the OCNE 1.9 module</td>
+</tr>
+<tr>
+<td>cert-manager</td>
+<td>1.17.4</td>
+<td>Its release branch supports Kubernetes 1.29; now outside community maintenance</td>
+</tr>
+<tr>
+<td>Database Operator</td>
+<td>2.2.0, source ff6f9178c1650df30afbf203ebdb633e9b80760a</td>
+<td>Source inspected for this RAC API and sample</td>
+</tr>
+<tr>
+<td>Controller image</td>
+<td>sha256:f378d66fd0b47b6089f01caf4ca86f90f3b3593cdca75292ff6491955c451cc0</td>
+<td>Verified amd64 image, avoids mutable latest</td>
+</tr>
+<tr>
+<td>Watch scope</td>
+<td>oracle-database-operator-system,rac</td>
+<td>Namespace-scoped installation; both require access</td>
+</tr>
+<tr>
+<td>Controller replicas</td>
+<td>1</td>
+<td>Local lab capacity choice</td>
+</tr>
+</tbody>
+</table>
+<p>Use the reviewed assets under <a href="../config/vendor/README.md">config/vendor</a>; its README records upstream origin, hashes, license and local changes. Check <a href="https://cert-manager.io/docs/releases/">cert-manager supported releases</a> before any substitution. Do not install the newest cert-manager onto Kubernetes 1.29 without verifying compatibility. This manual reproduces the specified historical lab rather than claiming a currently maintained production stack.</p>
+<p>On <strong>Windows PowerShell</strong>, check and transfer only the prerequisite files:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+Get-ChildItem .\config\vendor\*.yaml | Get-FileHash -Algorithm SHA256
+ssh ocne-cp 'install -d -m 0755 ~/ocne-rac-prereqs'
+scp .\config\vendor\cert-manager-v1.17.4.yaml ocne-cp:~/ocne-rac-prereqs/
+scp .\config\vendor\oracle-database-operator-2.2.0-rbac.yaml ocne-cp:~/ocne-rac-prereqs/
+scp .\config\vendor\oracle-database-operator-2.2.0-system.yaml ocne-cp:~/ocne-rac-prereqs/
+scp .\config\vendor\rac-pv-rbac.yaml .\config\vendor\rac-multus-rbac.yaml .\config\vendor\rac-node-rbac.yaml ocne-cp:~/ocne-rac-prereqs/
+</code></pre>
+<p>Equivalent <strong>Git Bash</strong>:</p>
+<pre><code class="language-bash">cd /d/OCNE19-Lab
+sha256sum config/vendor/*.yaml
+ssh ocne-cp 'install -d -m 0755 ~/ocne-rac-prereqs'
+scp config/vendor/cert-manager-v1.17.4.yaml config/vendor/oracle-database-operator-2.2.0-rbac.yaml config/vendor/oracle-database-operator-2.2.0-system.yaml config/vendor/rac-pv-rbac.yaml config/vendor/rac-multus-rbac.yaml config/vendor/rac-node-rbac.yaml ocne-cp:~/ocne-rac-prereqs/
+</code></pre>
+<p>On <strong>ocne-cp</strong>, compare destination hashes to the workstation values:</p>
+<pre><code class="language-bash">cd ~/ocne-rac-prereqs
+sha256sum cert-manager-v1.17.4.yaml oracle-database-operator-2.2.0-rbac.yaml oracle-database-operator-2.2.0-system.yaml rac-pv-rbac.yaml rac-multus-rbac.yaml rac-node-rbac.yaml
+</code></pre>
+<p>Never run <code>kubectl apply -R -f config/</code>: that directory also contains the RAC provisioning manifest and diagnostic pods.</p>
+<h3 id="2a4-if-you-want-to-reproduce-the-namespace-manifest-generation">2a.4 If you want to reproduce the namespace manifest generation</h3>
+<p>This is an optional source-reproduction path, <strong>not a second operator installation</strong>. Run in a separate directory on a workstation/guest with Git and Bash. The vendor YAML already contains the reviewed result.</p>
+<pre><code class="language-bash">git clone https://github.com/oracle/oracle-database-operator.git oracle-database-operator-src
+cd oracle-database-operator-src
+git checkout --detach ff6f9178c1650df30afbf203ebdb633e9b80760a
+git rev-parse HEAD
+bash scripts/generate-namespace-install.sh --watch-namespaces oracle-database-operator-system,rac --output-dir dist/install
+</code></pre>
+<p>Inspect the generated system YAML. For this lab change only the controller Deployment to one replica and the verified image digest listed above; preserve its selectors, environment, service account, webhook, certificate and CRD definitions. Compare your output to the vendor manifests. The separate RAC PV/Multus/node RBAC assets are required in addition to namespace generation. They do not provision volumes merely by granting permissions.</p>
+<p><strong>Gate 2a:</strong> healthy foundation, authorized cluster access, versions selected, individual manifests copied and hashes matched.</p>
+<h2 id="2b-installing-oracle-database-operator-step-by-step">2b. Installing Oracle Database Operator step by step</h2>
+<p>All commands below run <strong>on ocne-cp as labadmin</strong>, from <code>~/ocne-rac-prereqs</code>. This is a new-install sequence. Stop at the first unexpected error.</p>
+<h3 id="2b1-create-the-database-namespace">2b.1 Create the database namespace</h3>
+<pre><code class="language-bash">kubectl get namespace rac --ignore-not-found
+# Run only if the result above is empty:
+kubectl create namespace rac
+</code></pre>
+<p>Expected new-install output: <code>namespace/rac created</code>. Later Multus YAML contains the same namespace and adds a descriptive label. Keep the name consistent with the controller watch list.</p>
+<h3 id="2b2-install-cert-manager">2b.2 Install cert-manager</h3>
+<pre><code class="language-bash">cd ~/ocne-rac-prereqs
+kubectl apply --server-side -f cert-manager-v1.17.4.yaml
+kubectl rollout status deployment/cert-manager -n cert-manager --timeout=240s
+kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=240s
+kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=240s
+kubectl get deployments,pods -n cert-manager -o wide
+</code></pre>
+<p>The apply output has one created/configured line per resource. Each rollout must finish successfully; all three Deployments must have 1/1 Ready and one available replica. If a rollout times out, inspect events and the named pod's describe/logs. Do not continue with an unavailable webhook.</p>
+<h3 id="2b3-install-namespace-permissions-and-required-rac-permissions">2b.3 Install namespace permissions and required RAC permissions</h3>
+<pre><code class="language-bash">kubectl apply --server-side -f oracle-database-operator-2.2.0-rbac.yaml
+kubectl apply --server-side -f rac-pv-rbac.yaml
+kubectl apply --server-side -f rac-multus-rbac.yaml
+kubectl apply --server-side -f rac-node-rbac.yaml
+</code></pre>
+<p>Verify the exact service-account identity. These commands ask Kubernetes authorization; they do not impersonate it to make changes:</p>
+<pre><code class="language-bash">identity=system:serviceaccount:oracle-database-operator-system:oracle-database-operator-controller-manager
+kubectl auth can-i list pods --as=&quot;$identity&quot; -n rac
+kubectl auth can-i list pods --as=&quot;$identity&quot; -n oracle-database-operator-system
+kubectl auth can-i get nodes --as=&quot;$identity&quot;
+kubectl auth can-i create persistentvolumes --as=&quot;$identity&quot;
+kubectl auth can-i list network-attachment-definitions.k8s.cni.cncf.io --as=&quot;$identity&quot; -n rac
+</code></pre>
+<p>Expected: <code>yes</code> for each. Before Multus is installed, kubectl may warn that the NAD resource type is not discovered; repeat that check after chapter 3 installs its CRD. A <code>no</code> is a permissions error to fix before database provisioning. Do not grant cluster-admin as a shortcut.</p>
+<h3 id="2b4-install-the-controller-apis-and-certificates">2b.4 Install the controller, APIs and certificates</h3>
+<pre><code class="language-bash">kubectl apply --server-side -f oracle-database-operator-2.2.0-system.yaml
+kubectl wait --for=condition=Established crd/racdatabases.database.oracle.com --timeout=120s
+kubectl wait --for=condition=Ready certificates --all -n oracle-database-operator-system --timeout=180s
+kubectl rollout status deployment/oracle-database-operator-controller-manager -n oracle-database-operator-system --timeout=240s
+</code></pre>
+<p>Expected: CRD condition met, both operator certificates Ready, Deployment successfully rolled out. CRD existence alone is not controller readiness. Certificates rely on the cert-manager webhook/cainjector installed above.</p>
+<h3 id="2b5-check-installation-and-learn-the-rac-api">2b.5 Check installation and learn the RAC API</h3>
+<pre><code class="language-bash">kubectl get pods,certificates -n oracle-database-operator-system -o wide
+kubectl get crd racdatabases.database.oracle.com
+kubectl api-resources --api-group=database.oracle.com
+kubectl explain racdatabase --api-version=database.oracle.com/v4
+kubectl explain racdatabase.spec --api-version=database.oracle.com/v4
+kubectl get racdatabases -A
+kubectl get validatingwebhookconfigurations
+</code></pre>
+<p>On a new installation, the RacDatabase list is empty. On the completed lab it already contains rac19c. <code>kubectl explain</code> describes the installed schema; the pinned source/admission code supplies additional restrictions, including at least 16 GiB ordinary pod memory and immutable service naming after creation.</p>
+<p>Inspect logs locally if a condition fails:</p>
+<pre><code class="language-bash">kubectl get events -n oracle-database-operator-system --sort-by=.metadata.creationTimestamp
+kubectl describe deployment oracle-database-operator-controller-manager -n oracle-database-operator-system
+kubectl logs deployment/oracle-database-operator-controller-manager -n oracle-database-operator-system --tail=100
+</code></pre>
+<p>Raw logs may contain provisioning details; review/redact them before sharing. Do not dump Secret data. A certificate error requires checking Certificate conditions, webhook endpoints, CA injection and clock validity; a Forbidden error requires checking the denied verb/resource against the applied RBAC.</p>
+<h3 id="2b6-completion-gate-and-captured-output">2b.6 Completion gate and captured output</h3>
+<p><strong>Captured 11 October 2026 at 18:45 UTC</strong>, full output of the listed checks:</p>
+<pre><code class="language-text">$ kubectl -n cert-manager get deployments
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+cert-manager              1/1     1            1           30h
+cert-manager-cainjector   1/1     1            1           30h
+cert-manager-webhook      1/1     1            1           30h
+
+$ kubectl -n oracle-database-operator-system get pods,certificates
+NAME                                                              READY   STATUS    RESTARTS   AGE
+pod/oracle-database-operator-controller-manager-7c5c7c7f4-5k4kv   1/1     Running   1          30h
+
+NAME                                                                 READY   SECRET                AGE
+certificate.cert-manager.io/oracle-database-operator-metrics-certs   True    metrics-server-cert   30h
+certificate.cert-manager.io/oracle-database-operator-serving-cert    True    webhook-server-cert   30h
+</code></pre>
+<p>Your pod suffix, ages and restart counts will differ. Healthy current conditions matter; investigate unexpected new restarts. This gate establishes the operator installation. RAC storage, networks, media and validation are chapter 3.</p>
+<p>Sources: <a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/scripts/generate-namespace-install.sh">pinned namespace generator</a>, <a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/prerequisites_oracle_rac_db.md">operator RAC prerequisites</a>, <a href="../config/vendor/README.md">vendor provenance and licenses</a>.</p>
+<p><a href="MANUAL-03-RAC.html">Continue to 3. RAC</a></p>
+</main></body></html>

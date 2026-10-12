@@ -1,0 +1,12 @@
+sequenceDiagram
+ participant U as Administrator / kubectl
+ participant K as Kubernetes API
+ participant M as cert-manager
+ participant O as Database Operator
+ U->>K: Install cert-manager and CRDs
+ U->>K: Install namespace RBAC and RAC permissions
+ U->>K: Install operator Deployment and Certificate objects
+ M->>K: Issue TLS Secrets and inject trust bundles
+ O->>K: Watch rac and operator namespace
+ U->>K: Verify controller, webhook and CRD
+ Note over U,O: No RacDatabase object created in chapter 2

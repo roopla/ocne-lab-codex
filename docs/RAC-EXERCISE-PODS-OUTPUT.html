@@ -1,0 +1,3079 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>RAC pod replacement: complete captured output</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: 324299a7d0a63e4f54556501666a3f10364cfec3881966dadc10cc9d6657ea97; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="RAC-EXERCISE-PODS-OUTPUT.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="rac-pod-replacement-complete-captured-output">RAC pod replacement: complete captured output</h1>
+<p>Actual maintenance on 11 October 2026. Pod2 was replaced first; Kubernetes replacement succeeded but Oracle recovery required the documented manual GI restoration. The first SQL gate fired before ASM/DB startup completed; the later full acceptance passed. No forced deletion or storage reinitialization was used. See <a href="RAC-POD-EXERCISES.html">the workbook</a> for commands, interpretation and limits. Full object JSON is retained where captured; it includes Secret references, never Secret payloads. Tabs are expanded.</p>
+<h2 id="normal-deletion-and-failed-immediate-sql-gate">Normal deletion and failed immediate SQL gate</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Exercise-RAC-Pod-Replacement-20261011-194752.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">
+UTC 2026-10-11T23:47:52.630622+00:00 $ kubectl exec -n rac racnode1-0 -- cat /u01/app/oracle/recovery-backups/manual-exercises-20261011/exit-code
+0
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:47:52.758853+00:00 $ kubectl get racdatabase rac19c -n rac -o json
+{
+    &quot;apiVersion&quot;: &quot;database.oracle.com/v4&quot;,
+    &quot;kind&quot;: &quot;RacDatabase&quot;,
+    &quot;metadata&quot;: {
+        &quot;annotations&quot;: {
+            &quot;kubectl.kubernetes.io/last-applied-configuration&quot;: &quot;{\&quot;apiVersion\&quot;:\&quot;database.oracle.com/v4\&quot;,\&quot;kind\&quot;:\&quot;RacDatabase\&quot;,\&quot;metadata\&quot;:{\&quot;annotations\&quot;:{},\&quot;name\&quot;:\&quot;rac19c\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;},\&quot;spec\&quot;:{\&quot;asmDiskGroupDetails\&quot;:[{\&quot;disks\&quot;:[\&quot;/dev/disk/by-partlabel/ocne-rac-asm01\&quot;,\&quot;/dev/disk/by-partlabel/ocne-rac-asm02\&quot;],\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;redundancy\&quot;:\&quot;EXTERNAL\&quot;,\&quot;type\&quot;:\&quot;CRSDG\&quot;}],\&quot;configParams\&quot;:{\&quot;cpuCount\&quot;:4,\&quot;dbBase\&quot;:\&quot;/u01/app/oracle\&quot;,\&quot;dbHome\&quot;:\&quot;/u01/app/oracle/product/19c/dbhome_1\&quot;,\&quot;dbName\&quot;:\&quot;RACCDB\&quot;,\&quot;dbSwZipFile\&quot;:\&quot;oracle-dbhome-19.32.zip\&quot;,\&quot;gridBase\&quot;:\&quot;/u01/app/grid\&quot;,\&quot;gridHome\&quot;:\&quot;/u01/app/19c/grid\&quot;,\&quot;gridSwZipFile\&quot;:\&quot;oracle-gridhome-19.32.zip\&quot;,\&quot;hostSwStageLocation\&quot;:\&quot;/scratch/software/stage/19c/19.32-gold\&quot;,\&quot;inventory\&quot;:\&quot;/u01/app/oraInventory\&quot;,\&quot;pdbName\&quot;:\&quot;LABPDB\&quot;,\&quot;pgaSize\&quot;:\&quot;2G\&quot;,\&quot;processes\&quot;:500,\&quot;sgaSize\&quot;:\&quot;3G\&quot;},\&quot;dbSecret\&quot;:{\&quot;encryptionType\&quot;:\&quot;pkeyutl\&quot;,\&quot;keyFileName\&quot;:\&quot;key.pem\&quot;,\&quot;name\&quot;:\&quot;rac-db-password\&quot;,\&quot;pkeyopt\&quot;:\&quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256\&quot;,\&quot;pwdFileName\&quot;:\&quot;pwdfile.enc\&quot;},\&quot;envVars\&quot;:[{\&quot;name\&quot;:\&quot;ORACLE_PDB_NAME\&quot;,\&quot;value\&quot;:\&quot;LABPDB\&quot;},{\&quot;name\&quot;:\&quot;LOG_DIR\&quot;,\&quot;value\&quot;:\&quot;/tmp/orod\&quot;},{\&quot;name\&quot;:\&quot;TOTAL_MEMORY\&quot;,\&quot;value\&quot;:\&quot;16384\&quot;}],\&quot;image\&quot;:\&quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d\&quot;,\&quot;imagePullPolicy\&quot;:\&quot;IfNotPresent\&quot;,\&quot;instanceDetails\&quot;:{\&quot;baseLsnrTargetPort\&quot;:31522,\&quot;baseOnsTargetPort\&quot;:30200,\&quot;nodeCount\&quot;:2,\&quot;privateIPDetails\&quot;:[{\&quot;interface\&quot;:\&quot;ens1\&quot;,\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;},{\&quot;interface\&quot;:\&quot;ens2\&quot;,\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;}],\&quot;racHostSwLocation\&quot;:\&quot;/scratch/rac/cluster01\&quot;,\&quot;racNodeName\&quot;:\&quot;racnode\&quot;,\&quot;workerNodeSelector\&quot;:{\&quot;raccluster\&quot;:\&quot;raccluster01\&quot;}},\&quot;resources\&quot;:{\&quot;limits\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;},\&quot;requests\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;}},\&quot;scanSvcName\&quot;:\&quot;racnode-scan\&quot;,\&quot;scanSvcTargetPort\&quot;:31521,\&quot;securityContext\&quot;:{\&quot;sysctls\&quot;:[{\&quot;name\&quot;:\&quot;kernel.shmall\&quot;,\&quot;value\&quot;:\&quot;2097152\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmax\&quot;,\&quot;value\&quot;:\&quot;8589934592\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmni\&quot;,\&quot;value\&quot;:\&quot;4096\&quot;},{\&quot;name\&quot;:\&quot;kernel.sem\&quot;,\&quot;value\&quot;:\&quot;250 32000 100 128\&quot;},{\&quot;name\&quot;:\&quot;net.ipv4.conf.all.rp_filter\&quot;,\&quot;value\&quot;:\&quot;2\&quot;}]},\&quot;serviceDetails\&quot;:{\&quot;name\&quot;:\&quot;labpdb\&quot;},\&quot;sshKeySecret\&quot;:{\&quot;name\&quot;:\&quot;rac-ssh-key\&quot;,\&quot;privKeySecretName\&quot;:\&quot;ssh-privkey\&quot;,\&quot;pubKeySecretName\&quot;:\&quot;ssh-pubkey\&quot;}}}\n&quot;,
+            &quot;racdatabases.database.oracle.com/old-spec&quot;: &quot;{\&quot;instanceDetails\&quot;:{\&quot;nodeCount\&quot;:2,\&quot;racHostSwLocation\&quot;:\&quot;/scratch/rac/cluster01\&quot;,\&quot;racNodeName\&quot;:\&quot;racnode\&quot;,\&quot;baseOnsTargetPort\&quot;:30200,\&quot;baseLsnrTargetPort\&quot;:31522,\&quot;privateIPDetails\&quot;:[{\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;,\&quot;interface\&quot;:\&quot;ens1\&quot;},{\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;,\&quot;interface\&quot;:\&quot;ens2\&quot;}],\&quot;workerNodeSelector\&quot;:{\&quot;raccluster\&quot;:\&quot;raccluster01\&quot;}},\&quot;configParams\&quot;:{\&quot;gridHome\&quot;:\&quot;/u01/app/19c/grid\&quot;,\&quot;dbHome\&quot;:\&quot;/u01/app/oracle/product/19c/dbhome_1\&quot;,\&quot;gridBase\&quot;:\&quot;/u01/app/grid\&quot;,\&quot;dbBase\&quot;:\&quot;/u01/app/oracle\&quot;,\&quot;inventory\&quot;:\&quot;/u01/app/oraInventory\&quot;,\&quot;gridSwZipFile\&quot;:\&quot;oracle-gridhome-19.32.zip\&quot;,\&quot;dbSwZipFile\&quot;:\&quot;oracle-dbhome-19.32.zip\&quot;,\&quot;cpuCount\&quot;:4,\&quot;sgaSize\&quot;:\&quot;3G\&quot;,\&quot;pgaSize\&quot;:\&quot;2G\&quot;,\&quot;processes\&quot;:500,\&quot;dbName\&quot;:\&quot;RACCDB\&quot;,\&quot;pdbName\&quot;:\&quot;LABPDB\&quot;,\&quot;dbCharSet\&quot;:\&quot;AL32UTF8\&quot;,\&quot;swMountLocation\&quot;:\&quot;/u01\&quot;,\&quot;hostSwStageLocation\&quot;:\&quot;/scratch/software/stage/19c/19.32-gold\&quot;},\&quot;asmDiskGroupDetails\&quot;:[{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;redundancy\&quot;:\&quot;EXTERNAL\&quot;,\&quot;type\&quot;:\&quot;CRSDG\&quot;,\&quot;disks\&quot;:[\&quot;/dev/disk/by-partlabel/ocne-rac-asm01\&quot;,\&quot;/dev/disk/by-partlabel/ocne-rac-asm02\&quot;]},{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;type\&quot;:\&quot;DBDATAFILESDG\&quot;,\&quot;disks\&quot;:null},{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;type\&quot;:\&quot;DBRECOVERY\&quot;,\&quot;disks\&quot;:null}],\&quot;envVars\&quot;:[{\&quot;name\&quot;:\&quot;ORACLE_PDB_NAME\&quot;,\&quot;value\&quot;:\&quot;LABPDB\&quot;},{\&quot;name\&quot;:\&quot;LOG_DIR\&quot;,\&quot;value\&quot;:\&quot;/tmp/orod\&quot;},{\&quot;name\&quot;:\&quot;TOTAL_MEMORY\&quot;,\&quot;value\&quot;:\&quot;16384\&quot;}],\&quot;image\&quot;:\&quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d\&quot;,\&quot;sshKeySecret\&quot;:{\&quot;name\&quot;:\&quot;rac-ssh-key\&quot;,\&quot;keyMountLocation\&quot;:\&quot;/mnt/.ssh\&quot;,\&quot;privKeySecretName\&quot;:\&quot;ssh-privkey\&quot;,\&quot;pubKeySecretName\&quot;:\&quot;ssh-pubkey\&quot;},\&quot;imagePullPolicy\&quot;:\&quot;IfNotPresent\&quot;,\&quot;scanSvcName\&quot;:\&quot;racnode-scan\&quot;,\&quot;securityContext\&quot;:{\&quot;sysctls\&quot;:[{\&quot;name\&quot;:\&quot;kernel.shmall\&quot;,\&quot;value\&quot;:\&quot;2097152\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmax\&quot;,\&quot;value\&quot;:\&quot;8589934592\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmni\&quot;,\&quot;value\&quot;:\&quot;4096\&quot;},{\&quot;name\&quot;:\&quot;kernel.sem\&quot;,\&quot;value\&quot;:\&quot;250 32000 100 128\&quot;},{\&quot;name\&quot;:\&quot;net.ipv4.conf.all.rp_filter\&quot;,\&quot;value\&quot;:\&quot;2\&quot;}]},\&quot;scanSvcTargetPort\&quot;:31521,\&quot;dbSecret\&quot;:{\&quot;name\&quot;:\&quot;rac-db-password\&quot;,\&quot;keyFileName\&quot;:\&quot;key.pem\&quot;,\&quot;pwdFileName\&quot;:\&quot;pwdfile.enc\&quot;,\&quot;pwdFileMountLocation\&quot;:\&quot;/mnt/.dbsecrets\&quot;,\&quot;keyFileMountLocation\&quot;:\&quot;/mnt/.dbsecrets\&quot;,\&quot;encryptionType\&quot;:\&quot;pkeyutl\&quot;,\&quot;pkeyopt\&quot;:\&quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256\&quot;},\&quot;serviceDetails\&quot;:{\&quot;name\&quot;:\&quot;labpdb\&quot;},\&quot;resources\&quot;:{\&quot;limits\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;},\&quot;requests\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;}}}&quot;
+        },
+        &quot;creationTimestamp&quot;: &quot;2026-10-11T02:14:00Z&quot;,
+        &quot;finalizers&quot;: [
+            &quot;database.oracle.com/racdatabasefinalizer&quot;
+        ],
+        &quot;generation&quot;: 3,
+        &quot;name&quot;: &quot;rac19c&quot;,
+        &quot;namespace&quot;: &quot;rac&quot;,
+        &quot;resourceVersion&quot;: &quot;388625&quot;,
+        &quot;uid&quot;: &quot;6be9de9e-f884-4b82-848b-52eadd7213d1&quot;
+    },
+    &quot;spec&quot;: {
+        &quot;asmDiskGroupDetails&quot;: [
+            {
+                &quot;disks&quot;: [
+                    &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                    &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                ],
+                &quot;name&quot;: &quot;DATA&quot;,
+                &quot;redundancy&quot;: &quot;EXTERNAL&quot;,
+                &quot;type&quot;: &quot;CRSDG&quot;
+            }
+        ],
+        &quot;configParams&quot;: {
+            &quot;cpuCount&quot;: 4,
+            &quot;dbBase&quot;: &quot;/u01/app/oracle&quot;,
+            &quot;dbHome&quot;: &quot;/u01/app/oracle/product/19c/dbhome_1&quot;,
+            &quot;dbName&quot;: &quot;RACCDB&quot;,
+            &quot;dbSwZipFile&quot;: &quot;oracle-dbhome-19.32.zip&quot;,
+            &quot;gridBase&quot;: &quot;/u01/app/grid&quot;,
+            &quot;gridHome&quot;: &quot;/u01/app/19c/grid&quot;,
+            &quot;gridSwZipFile&quot;: &quot;oracle-gridhome-19.32.zip&quot;,
+            &quot;hostSwStageLocation&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+            &quot;inventory&quot;: &quot;/u01/app/oraInventory&quot;,
+            &quot;pdbName&quot;: &quot;LABPDB&quot;,
+            &quot;pgaSize&quot;: &quot;2G&quot;,
+            &quot;processes&quot;: 500,
+            &quot;sgaSize&quot;: &quot;3G&quot;,
+            &quot;swMountLocation&quot;: &quot;/u01&quot;
+        },
+        &quot;dbSecret&quot;: {
+            &quot;encryptionType&quot;: &quot;pkeyutl&quot;,
+            &quot;keyFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;keyFileName&quot;: &quot;key.pem&quot;,
+            &quot;name&quot;: &quot;rac-db-password&quot;,
+            &quot;pkeyopt&quot;: &quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256&quot;,
+            &quot;pwdFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;pwdFileName&quot;: &quot;pwdfile.enc&quot;
+        },
+        &quot;envVars&quot;: [
+            {
+                &quot;name&quot;: &quot;ORACLE_PDB_NAME&quot;,
+                &quot;value&quot;: &quot;LABPDB&quot;
+            },
+            {
+                &quot;name&quot;: &quot;LOG_DIR&quot;,
+                &quot;value&quot;: &quot;/tmp/orod&quot;
+            },
+            {
+                &quot;name&quot;: &quot;TOTAL_MEMORY&quot;,
+                &quot;value&quot;: &quot;16384&quot;
+            }
+        ],
+        &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+        &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+        &quot;instanceDetails&quot;: {
+            &quot;baseLsnrTargetPort&quot;: 31522,
+            &quot;baseOnsTargetPort&quot;: 30200,
+            &quot;nodeCount&quot;: 2,
+            &quot;privateIPDetails&quot;: [
+                {
+                    &quot;interface&quot;: &quot;ens1&quot;,
+                    &quot;name&quot;: &quot;macvlan-conf1&quot;
+                },
+                {
+                    &quot;interface&quot;: &quot;ens2&quot;,
+                    &quot;name&quot;: &quot;macvlan-conf2&quot;
+                }
+            ],
+            &quot;racHostSwLocation&quot;: &quot;/scratch/rac/cluster01&quot;,
+            &quot;racNodeName&quot;: &quot;racnode&quot;,
+            &quot;workerNodeSelector&quot;: {
+                &quot;raccluster&quot;: &quot;raccluster01&quot;
+            }
+        },
+        &quot;resources&quot;: {
+            &quot;limits&quot;: {
+                &quot;cpu&quot;: &quot;4&quot;,
+                &quot;memory&quot;: &quot;16Gi&quot;
+            },
+            &quot;requests&quot;: {
+                &quot;cpu&quot;: &quot;4&quot;,
+                &quot;memory&quot;: &quot;16Gi&quot;
+            }
+        },
+        &quot;scanSvcName&quot;: &quot;racnode-scan&quot;,
+        &quot;scanSvcTargetPort&quot;: 31521,
+        &quot;securityContext&quot;: {
+            &quot;sysctls&quot;: [
+                {
+                    &quot;name&quot;: &quot;kernel.shmall&quot;,
+                    &quot;value&quot;: &quot;2097152&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmax&quot;,
+                    &quot;value&quot;: &quot;8589934592&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmni&quot;,
+                    &quot;value&quot;: &quot;4096&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.sem&quot;,
+                    &quot;value&quot;: &quot;250 32000 100 128&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.all.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                }
+            ]
+        },
+        &quot;serviceDetails&quot;: {
+            &quot;name&quot;: &quot;labpdb&quot;
+        },
+        &quot;sshKeySecret&quot;: {
+            &quot;keyMountLocation&quot;: &quot;/mnt/.ssh&quot;,
+            &quot;name&quot;: &quot;rac-ssh-key&quot;,
+            &quot;privKeySecretName&quot;: &quot;ssh-privkey&quot;,
+            &quot;pubKeySecretName&quot;: &quot;ssh-pubkey&quot;
+        }
+    },
+    &quot;status&quot;: {
+        &quot;asmDiskGroups&quot;: [
+            {
+                &quot;disks&quot;: [
+                    {
+                        &quot;name&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;sizeInGb&quot;: 49,
+                        &quot;valid&quot;: true
+                    },
+                    {
+                        &quot;name&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;,
+                        &quot;sizeInGb&quot;: 49,
+                        &quot;valid&quot;: true
+                    }
+                ],
+                &quot;name&quot;: &quot;DATA&quot;,
+                &quot;redundancy&quot;: &quot;EXTERN&quot;,
+                &quot;type&quot;: &quot;CRSDG&quot;
+            }
+        ],
+        &quot;clientEtcHost&quot;: [
+            &quot;192.168.77.12    racnode1-0.rac.svc.cluster.local racnode1-0-vip.rac.svc.cluster.local    racnode-scan.rac.svc.cluster.local&quot;,
+            &quot;192.168.77.13    racnode2-0.rac.svc.cluster.local racnode2-0-vip.rac.svc.cluster.local    racnode-scan.rac.svc.cluster.local&quot;
+        ],
+        &quot;conditions&quot;: [
+            {
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T23:47:30Z&quot;,
+                &quot;message&quot;: &quot;no reconcile errors&quot;,
+                &quot;observedGeneration&quot;: 3,
+                &quot;reason&quot;: &quot;LastReconcileCycleCompleted&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ReconcileComplete&quot;
+            },
+            {
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:16Z&quot;,
+                &quot;message&quot;: &quot;RAC pods pending: [racnode1-0]&quot;,
+                &quot;observedGeneration&quot;: 1,
+                &quot;reason&quot;: &quot;LastReconcileCycleWaiting&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ReconcileWaiting&quot;
+            }
+        ],
+        &quot;configParams&quot;: {
+            &quot;dbBase&quot;: &quot;/u01/app/oracle&quot;,
+            &quot;dbHome&quot;: &quot;/u01/app/oracle/product/19c/dbhome_1&quot;,
+            &quot;dbName&quot;: &quot;RACCDB&quot;,
+            &quot;gridBase&quot;: &quot;/u01/app/grid&quot;,
+            &quot;gridHome&quot;: &quot;/u01/app/19c/grid&quot;,
+            &quot;inventory&quot;: &quot;/u01/app/oraInventory&quot;
+        },
+        &quot;connectString&quot;: &quot;racnode-scan:1521/RACCDB&quot;,
+        &quot;dbSecret&quot;: {
+            &quot;encryptionType&quot;: &quot;pkeyutl&quot;,
+            &quot;keyFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;keyFileName&quot;: &quot;key.pem&quot;,
+            &quot;name&quot;: &quot;rac-db-password&quot;,
+            &quot;pkeyopt&quot;: &quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256&quot;,
+            &quot;pwdFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;pwdFileName&quot;: &quot;pwdfile.enc&quot;
+        },
+        &quot;dbState&quot;: &quot;OPEN&quot;,
+        &quot;externalConnectString&quot;: &quot;racnode-scan.rac.svc.cluster.local:31521/labpdb&quot;,
+        &quot;observedGeneration&quot;: 3,
+        &quot;pdbConnectString&quot;: &quot;racnode-scan:1521/ORCLPDB&quot;,
+        &quot;racNodes&quot;: [
+            {
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;nodeDetails&quot;: {
+                    &quot;InstanceState&quot;: &quot;OPEN&quot;,
+                    &quot;PodState&quot;: &quot;AVAILABLE&quot;,
+                    &quot;clusterState&quot;: &quot;HEALTHY&quot;,
+                    &quot;mountedDevices&quot;: [
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                    ],
+                    &quot;state&quot;: &quot;AVAILABLE&quot;,
+                    &quot;vipDetails&quot;: {
+                        &quot;Name&quot;: &quot;racnode1-0-vip&quot;
+                    }
+                }
+            },
+            {
+                &quot;name&quot;: &quot;racnode2-0&quot;,
+                &quot;nodeDetails&quot;: {
+                    &quot;InstanceState&quot;: &quot;OPEN&quot;,
+                    &quot;PodState&quot;: &quot;AVAILABLE&quot;,
+                    &quot;clusterState&quot;: &quot;HEALTHY&quot;,
+                    &quot;mountedDevices&quot;: [
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                    ],
+                    &quot;state&quot;: &quot;AVAILABLE&quot;,
+                    &quot;vipDetails&quot;: {
+                        &quot;Name&quot;: &quot;racnode2-0-vip&quot;
+                    }
+                }
+            }
+        ],
+        &quot;releaseUpdate&quot;: &quot;19.32.0.0.0&quot;,
+        &quot;role&quot;: &quot;PRIMARY&quot;,
+        &quot;scanSvcName&quot;: &quot;racnode-scan&quot;,
+        &quot;serviceDetails&quot;: {
+            &quot;name&quot;: &quot;labpdb&quot;,
+            &quot;svcState&quot;: &quot;prcr-1001 : resource ora.raccdb.labpdb.svc does not exist&quot;
+        },
+        &quot;state&quot;: &quot;AVAILABLE&quot;
+    }
+}
+Exit code: 0
+
+UTC 2026-10-11T23:47:52.817866+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '&quot;'&quot;'/ as sysdba'&quot;'&quot;''
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 LABPDB                                                               READ WRITE
+     2 LABPDB                                                               READ WRITE
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:47:53.163000+00:00 $ kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status service -db RACCDB'
+Service labpdb_app is running on instance(s) RACCDB1,RACCDB2
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:47:53.911189+00:00 $ kubectl -n rac get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE   IP           NODE               NOMINATED NODE   READINESS GATES
+racnode1-0   1/1     Running   0          21h   10.244.1.9   ocne-w1.lab.test   &lt;none&gt;           &lt;none&gt;
+racnode2-0   1/1     Running   0          21h   10.244.2.9   ocne-w2.lab.test   &lt;none&gt;           &lt;none&gt;
+Exit code: 0
+
+UTC 2026-10-11T23:47:53.974486+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s /nolog'
+
+PDB          INSTANCE_NAME
+-------------------- --------------------
+LABPDB           RACCDB1
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:47:54.240933+00:00 $ kubectl -n rac get pod racnode2-0 -o json
+{
+    &quot;apiVersion&quot;: &quot;v1&quot;,
+    &quot;kind&quot;: &quot;Pod&quot;,
+    &quot;metadata&quot;: {
+        &quot;annotations&quot;: {
+            &quot;database.oracle.com/rac-configmap-hash&quot;: &quot;bfd74fa7cef62fb8f9af88a0c1928697ed164fb54a2d14584bf2eb1e64c36597&quot;,
+            &quot;k8s.v1.cni.cncf.io/network-status&quot;: &quot;[{\n    \&quot;name\&quot;: \&quot;cbr0\&quot;,\n    \&quot;interface\&quot;: \&quot;eth0\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;10.244.2.9\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;16:66:bd:cd:7a:b3\&quot;,\n    \&quot;default\&quot;: true,\n    \&quot;dns\&quot;: {},\n    \&quot;gateway\&quot;: [\n        \&quot;10.244.2.1\&quot;\n    ]\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf1\&quot;,\n    \&quot;interface\&quot;: \&quot;ens1\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.78.121\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;a2:af:c0:f6:58:bd\&quot;,\n    \&quot;dns\&quot;: {}\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf2\&quot;,\n    \&quot;interface\&quot;: \&quot;ens2\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.79.121\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;16:25:d7:82:59:0d\&quot;,\n    \&quot;dns\&quot;: {}\n}]&quot;,
+            &quot;k8s.v1.cni.cncf.io/networks&quot;: &quot;[{\&quot;interface\&quot;:\&quot;ens1\&quot;,\&quot;ips\&quot;:[\&quot;192.168.78.121/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;},{\&quot;interface\&quot;:\&quot;ens2\&quot;,\&quot;ips\&quot;:[\&quot;192.168.79.121/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;}]&quot;
+        },
+        &quot;creationTimestamp&quot;: &quot;2026-10-11T02:14:16Z&quot;,
+        &quot;generateName&quot;: &quot;racnode2-&quot;,
+        &quot;labels&quot;: {
+            &quot;app&quot;: &quot;oracle-database-operator&quot;,
+            &quot;apps.kubernetes.io/pod-index&quot;: &quot;0&quot;,
+            &quot;controller-revision-hash&quot;: &quot;racnode2-5c6c49d448&quot;,
+            &quot;database.oracle.com/component&quot;: &quot;RAC&quot;,
+            &quot;database.oracle.com/managed-by&quot;: &quot;racdatabase-controller&quot;,
+            &quot;database.oracle.com/name&quot;: &quot;rac19c&quot;,
+            &quot;statefulset.kubernetes.io/pod-name&quot;: &quot;racnode2-0&quot;
+        },
+        &quot;name&quot;: &quot;racnode2-0&quot;,
+        &quot;namespace&quot;: &quot;rac&quot;,
+        &quot;ownerReferences&quot;: [
+            {
+                &quot;apiVersion&quot;: &quot;apps/v1&quot;,
+                &quot;blockOwnerDeletion&quot;: true,
+                &quot;controller&quot;: true,
+                &quot;kind&quot;: &quot;StatefulSet&quot;,
+                &quot;name&quot;: &quot;racnode2&quot;,
+                &quot;uid&quot;: &quot;36a782cc-eb79-4e70-824c-a8254db93474&quot;
+            }
+        ],
+        &quot;resourceVersion&quot;: &quot;315461&quot;,
+        &quot;uid&quot;: &quot;fb9bdc6d-2737-4291-bedd-121e30724c0a&quot;
+    },
+    &quot;spec&quot;: {
+        &quot;affinity&quot;: {
+            &quot;nodeAffinity&quot;: {
+                &quot;requiredDuringSchedulingIgnoredDuringExecution&quot;: {
+                    &quot;nodeSelectorTerms&quot;: [
+                        {
+                            &quot;matchExpressions&quot;: [
+                                {
+                                    &quot;key&quot;: &quot;raccluster&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;raccluster01&quot;
+                                    ]
+                                },
+                                {
+                                    &quot;key&quot;: &quot;kubernetes.io/hostname&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;ocne-w2.lab.test&quot;
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        &quot;containers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/usr/sbin/init&quot;
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode2-0&quot;,
+                &quot;ports&quot;: [
+                    {
+                        &quot;containerPort&quot;: 1521,
+                        &quot;name&quot;: &quot;tcp-1521jt4kj&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 1522,
+                        &quot;name&quot;: &quot;tcp-1522w42vh&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 22,
+                        &quot;name&quot;: &quot;tcp-22tvh6s&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 6200,
+                        &quot;name&quot;: &quot;tcp-6200vbkq2&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 8080,
+                        &quot;name&quot;: &quot;tcp-8080bqv2f&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 31523,
+                        &quot;name&quot;: &quot;tcp-31523v97ws&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 30201,
+                        &quot;name&quot;: &quot;tcp-302019kldq&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    }
+                ],
+                &quot;readinessProbe&quot;: {
+                    &quot;failureThreshold&quot;: 3,
+                    &quot;initialDelaySeconds&quot;: 180,
+                    &quot;periodSeconds&quot;: 5,
+                    &quot;successThreshold&quot;: 1,
+                    &quot;tcpSocket&quot;: {
+                        &quot;port&quot;: 31522
+                    },
+                    &quot;timeoutSeconds&quot;: 1
+                },
+                &quot;resources&quot;: {
+                    &quot;limits&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    },
+                    &quot;requests&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    }
+                },
+                &quot;securityContext&quot;: {
+                    &quot;capabilities&quot;: {
+                        &quot;add&quot;: [
+                            &quot;NET_ADMIN&quot;,
+                            &quot;SYS_NICE&quot;,
+                            &quot;SYS_RESOURCE&quot;,
+                            &quot;AUDIT_WRITE&quot;,
+                            &quot;NET_RAW&quot;,
+                            &quot;AUDIT_CONTROL&quot;,
+                            &quot;SYS_CHROOT&quot;
+                        ]
+                    },
+                    &quot;privileged&quot;: false
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeDevices&quot;: [
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                    },
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                    }
+                ],
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode2-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode2-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-lbtsk&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;dnsPolicy&quot;: &quot;ClusterFirst&quot;,
+        &quot;enableServiceLinks&quot;: true,
+        &quot;hostname&quot;: &quot;racnode2-0&quot;,
+        &quot;initContainers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/bin/bash&quot;,
+                    &quot;-c&quot;,
+                    &quot;\n\t\tsysctl -w net.ipv4.conf.all.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.default.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens1.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens2.rp_filter=2 || true \u0026\u0026\n\n\t\tIP1=$(ip addr show ens1 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\t\tIP2=$(ip addr show ens2 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\n\t\t# Write environment file (overwrite + append)\n\t\tif [ -n \&quot;$IP1\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP1=$IP1\&quot; \u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t\tif [ -n \&quot;$IP2\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP2=$IP2\&quot; \u003e\u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t/bin/true&quot;
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode2-init1&quot;,
+                &quot;resources&quot;: {},
+                &quot;securityContext&quot;: {
+                    &quot;privileged&quot;: true,
+                    &quot;runAsUser&quot;: 0
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode2-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode2-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode2-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-lbtsk&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;nodeName&quot;: &quot;ocne-w2.lab.test&quot;,
+        &quot;preemptionPolicy&quot;: &quot;PreemptLowerPriority&quot;,
+        &quot;priority&quot;: 0,
+        &quot;restartPolicy&quot;: &quot;Always&quot;,
+        &quot;schedulerName&quot;: &quot;default-scheduler&quot;,
+        &quot;securityContext&quot;: {
+            &quot;sysctls&quot;: [
+                {
+                    &quot;name&quot;: &quot;kernel.shmall&quot;,
+                    &quot;value&quot;: &quot;786432&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmax&quot;,
+                    &quot;value&quot;: &quot;3221225472&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmni&quot;,
+                    &quot;value&quot;: &quot;4096&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.sem&quot;,
+                    &quot;value&quot;: &quot;250 32000 100 128&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.all.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.default.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                }
+            ]
+        },
+        &quot;serviceAccount&quot;: &quot;default&quot;,
+        &quot;serviceAccountName&quot;: &quot;default&quot;,
+        &quot;subdomain&quot;: &quot;racnode&quot;,
+        &quot;terminationGracePeriodSeconds&quot;: 30,
+        &quot;tolerations&quot;: [
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/not-ready&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            },
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/unreachable&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            }
+        ],
+        &quot;volumes&quot;: [
+            {
+                &quot;name&quot;: &quot;racnode2-ssh-secretmap-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-ssh-key&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {
+                    &quot;medium&quot;: &quot;Memory&quot;
+                },
+                &quot;name&quot;: &quot;racnode2-oradshm-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;racnode2-dbsecret-pwd-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-db-password&quot;
+                }
+            },
+            {
+                &quot;configMap&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;name&quot;: &quot;racnode2rac19c-cmap&quot;
+                },
+                &quot;name&quot;: &quot;racnode2-oradata-envfile&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/rac/cluster01/racnode2&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode2-oradata-sw-vol&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode2-oradata-swstage-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                }
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {},
+                &quot;name&quot;: &quot;racnode2-oradata-envfile-writable&quot;
+            },
+            {
+                &quot;name&quot;: &quot;kube-api-access-lbtsk&quot;,
+                &quot;projected&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;sources&quot;: [
+                        {
+                            &quot;serviceAccountToken&quot;: {
+                                &quot;expirationSeconds&quot;: 3607,
+                                &quot;path&quot;: &quot;token&quot;
+                            }
+                        },
+                        {
+                            &quot;configMap&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;key&quot;: &quot;ca.crt&quot;,
+                                        &quot;path&quot;: &quot;ca.crt&quot;
+                                    }
+                                ],
+                                &quot;name&quot;: &quot;kube-root-ca.crt&quot;
+                            }
+                        },
+                        {
+                            &quot;downwardAPI&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;fieldRef&quot;: {
+                                            &quot;apiVersion&quot;: &quot;v1&quot;,
+                                            &quot;fieldPath&quot;: &quot;metadata.namespace&quot;
+                                        },
+                                        &quot;path&quot;: &quot;namespace&quot;
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    &quot;status&quot;: {
+        &quot;conditions&quot;: [
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodReadyToStartContainers&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Initialized&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:51Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Ready&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:51Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ContainersReady&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:21Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodScheduled&quot;
+            }
+        ],
+        &quot;containerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://63714943e672899a7b5ff649bbb0fbf22291b9fec202e0a0beac3d60e81cf2f6&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode2-0&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: true,
+                &quot;state&quot;: {
+                    &quot;running&quot;: {
+                        &quot;startedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;hostIP&quot;: &quot;192.168.77.13&quot;,
+        &quot;hostIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;192.168.77.13&quot;
+            }
+        ],
+        &quot;initContainerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://a0c2e26534369ffd86d4c67f218e8b7bd8834ab00f9b2fde6ddb7ca5aefb5216&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode2-init1&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: false,
+                &quot;state&quot;: {
+                    &quot;terminated&quot;: {
+                        &quot;containerID&quot;: &quot;cri-o://a0c2e26534369ffd86d4c67f218e8b7bd8834ab00f9b2fde6ddb7ca5aefb5216&quot;,
+                        &quot;exitCode&quot;: 0,
+                        &quot;finishedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                        &quot;reason&quot;: &quot;Completed&quot;,
+                        &quot;startedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;phase&quot;: &quot;Running&quot;,
+        &quot;podIP&quot;: &quot;10.244.2.9&quot;,
+        &quot;podIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;10.244.2.9&quot;
+            }
+        ],
+        &quot;qosClass&quot;: &quot;Burstable&quot;,
+        &quot;startTime&quot;: &quot;2026-10-11T02:14:21Z&quot;
+    }
+}
+Exit code: 0
+
+UTC 2026-10-11T23:47:54.303115+00:00 $ kubectl exec -n rac racnode2-0 -- cmp /etc/oracle/olr.loc /u01/app/grid/.etcoraclebackup/oracle/olr.loc
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:47:54.416466+00:00 $ kubectl exec -n rac racnode2-0 -- cmp /etc/oracle/ocr.loc /u01/app/grid/.etcoraclebackup/oracle/ocr.loc
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+SCENARIO S08: normal replacement of racnode2-0; old UID=fb9bdc6d-2737-4291-bedd-121e30724c0a
+
+UTC 2026-10-11T23:47:54.534932+00:00 $ kubectl -n rac delete pod racnode2-0 --grace-period=120 --wait=false
+pod &quot;racnode2-0&quot; deleted
+Exit code: 0
+2026-10-11T23:47:54.688127+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:48:09.774767+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:48:24.853819+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:48:39.939531+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:48:55.018597+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:49:10.104005+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:49:25.180056+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:49:40.259793+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Running Ready=True deleting=True
+2026-10-11T23:49:55.338084+00:00 racnode2-0 fb9bdc6d-2737-4291-bedd-121e30724c0a Failed Ready=False deleting=True
+2026-10-11T23:50:10.415770+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:50:25.504218+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:50:40.586151+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:50:55.660080+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:51:10.729078+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:51:25.849658+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:51:40.930316+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:51:56.003280+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:52:11.085233+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:52:26.167349+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:52:41.269866+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:52:56.344786+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:53:11.499461+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:53:26.585076+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:53:41.709313+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:53:56.799640+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:54:11.879941+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:54:26.951438+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:54:42.019952+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=False deleting=False
+2026-10-11T23:54:57.103182+00:00 racnode2-0 e5fb5f48-cfcc-4476-97d9-07338262095d Running Ready=True deleting=False
+
+UTC 2026-10-11T23:54:57.103245+00:00 $ kubectl -n rac get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE    IP            NODE               NOMINATED NODE   READINESS GATES
+racnode1-0   1/1     Running   0          21h    10.244.1.9    ocne-w1.lab.test   &lt;none&gt;           &lt;none&gt;
+racnode2-0   1/1     Running   0          5m2s   10.244.2.10   ocne-w2.lab.test   &lt;none&gt;           &lt;none&gt;
+Exit code: 0
+
+UTC 2026-10-11T23:54:57.169229+00:00 $ kubectl exec -n rac racnode2-0 -- /u01/app/19c/grid/bin/crsctl check crs
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:54:57.371784+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '&quot;'&quot;'/ as sysdba'&quot;'&quot;''
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 LABPDB                                                               READ WRITE
+
+declare n number; begin select count(*) into n from gv$instance where status='OPEN' and database_status='ACTIVE'; if n&lt;&gt;2 then raise_application_error(-20001,'Both instances must be open'); end if; end;
+*
+ERROR at line 1:
+ORA-20001: Both instances must be open
+ORA-06512: at line 1
+
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+command terminated with exit code 1
+Exit code: 1
+Traceback (most recent call last):
+  File &quot;&lt;stdin&gt;&quot;, line 62, in &lt;module&gt;
+  File &quot;&lt;stdin&gt;&quot;, line 16, in healthy
+  File &quot;&lt;stdin&gt;&quot;, line 14, in sql
+  File &quot;&lt;stdin&gt;&quot;, line 10, in k
+  File &quot;&lt;stdin&gt;&quot;, line 8, in run
+RuntimeError: Command failed; review captured output
+</code></pre>
+
+
+</details>
+
+<h2 id="first-guarded-recovery-attempt-stopped-without-changing-gi">First guarded recovery attempt: stopped without changing GI</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Recover-RAC-Replaced-Node2-20261011-195226.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+command terminated with exit code 1
+</code></pre>
+
+
+</details>
+
+<h2 id="worker2-recovery-labels">Worker2 recovery labels</h2>
+<p>Evidence: <code>logs/ssh-ocne-w2-Repair-RAC-Recovery-Labels-20261011-195332.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">drwx------. 3 root root  system_u:object_r:container_file_t:s0            20 Oct 11 19:38 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup
+drwxr-xr-x. 6 root 54321 system_u:object_r:container_file_t:s0:c589,c809 151 Oct 10 22:39 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle
+-rw-r--r--. 1 root 54321 system_u:object_r:container_file_t:s0:c589,c809  96 Oct 10 22:39 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/olr.loc
+/scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/olr.loc    system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/setasmgid from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/olr.loc from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/ocr.loc from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/ocr.loc.orig from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/olr.loc.orig from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/lastgasp from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/lastgasp/cssmonit_racnode2-0.lgl from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/lastgasp/cssagent_racnode2-0.lgl from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/maps from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/oprocd from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/oprocd/check from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/oprocd/stop from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/oprocd/fatal from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0 from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/grid from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/grid/cssfatal from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/root from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/root/crsstart from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/root/ohasdrun from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/root/ohasdinitpid from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/scls_scr/racnode2-0/root/ohasdstr from system_u:object_r:container_file_t:s0:c589,c809 to system_u:object_r:container_file_t:s0
+drwx------. 3 root root  system_u:object_r:container_file_t:s0  20 Oct 11 19:38 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup
+drwxr-xr-x. 6 root 54321 system_u:object_r:container_file_t:s0 151 Oct 10 22:39 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle
+-rw-r--r--. 1 root 54321 system_u:object_r:container_file_t:s0  96 Oct 10 22:39 /scratch/rac/cluster01/racnode2/app/grid/.etcoraclebackup/oracle/olr.loc
+</code></pre>
+
+
+</details>
+
+<h2 id="worker1-recovery-labels">Worker1 recovery labels</h2>
+<p>Evidence: <code>logs/ssh-ocne-w1-Repair-RAC-Recovery-Labels-20261011-195332.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">drwx------. 3 root root  system_u:object_r:container_file_t:s0            20 Oct 11 19:38 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup
+drwxr-xr-x. 6 root 54321 system_u:object_r:container_file_t:s0:c223,c536 151 Oct 10 22:34 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle
+-rw-r--r--. 1 root 54321 system_u:object_r:container_file_t:s0:c223,c536  96 Oct 10 22:34 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/olr.loc
+/scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/olr.loc    system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/setasmgid from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/olr.loc from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/ocr.loc from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/ocr.loc.orig from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/olr.loc.orig from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/lastgasp from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/lastgasp/cssmonit_racnode1-0.lgl from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/lastgasp/cssagent_racnode1-0.lgl from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/maps from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/oprocd from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/oprocd/check from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/oprocd/stop from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/oprocd/fatal from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0 from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/grid from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/grid/cssfatal from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/root from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/root/crsstart from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/root/ohasdrun from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/root/ohasdinitpid from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+Relabeled /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/scls_scr/racnode1-0/root/ohasdstr from system_u:object_r:container_file_t:s0:c223,c536 to system_u:object_r:container_file_t:s0
+drwx------. 3 root root  system_u:object_r:container_file_t:s0  20 Oct 11 19:38 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup
+drwxr-xr-x. 6 root 54321 system_u:object_r:container_file_t:s0 151 Oct 10 22:34 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle
+-rw-r--r--. 1 root 54321 system_u:object_r:container_file_t:s0  96 Oct 10 22:34 /scratch/rac/cluster01/racnode1/app/grid/.etcoraclebackup/oracle/olr.loc
+</code></pre>
+
+
+</details>
+
+<h2 id="node2-assisted-gi-recovery">Node2 assisted GI recovery</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Recover-RAC-Replaced-Node2-20261011-195349.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Using configuration parameter file: /u01/app/19c/grid/crs/install/crsconfig_params
+The log of current session can be found at:
+  /u01/app/grid/crsdata/racnode2-0/crsconfig/crsupdate_osfiles_racnode2-0_2026-10-11_11-53-49PM.log
+Redirecting to /bin/systemctl restart rsyslog.service
+2026/10/11 23:53:51 CLSRSC-330: Adding Clusterware entries to file 'oracle-ohasd.service'
+Changing permissions of /u01/app/oraInventory.
+Adding read,write permissions for group.
+Removing read,write,execute permissions for world.
+
+Changing groupname of /u01/app/oraInventory to oinstall.
+The execution of the script is complete.
+CRS-4123: Oracle High Availability Services has been started.
+</code></pre>
+
+
+</details>
+
+<h2 id="full-post-recovery-acceptance">Full post-recovery acceptance</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Verify-RAC-Database-20261011-195602.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">RacDatabase AVAILABLE
+pod/racnode1-0 condition met
+pod/racnode2-0 condition met
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+racnode1-0  1
+racnode2-0  2
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    102392    89616                0           89616              0             Y  DATA/
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39503034;ACFS RELEASE UPDATE 19.32.0.0.0 (39503034)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39107855;TOMCAT RELEASE UPDATE 19.0.0.0.0 (39107855)
+39107825;DBWLM RELEASE UPDATE 19.0.0.0.0 (39107825)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+NAME      OPEN_MODE        DATABASE_ROLE
+--------- -------------------- ----------------
+RACCDB    READ WRITE           PRIMARY
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 PDB$SEED                                                             READ ONLY
+     1 LABPDB                                                               READ WRITE
+     2 PDB$SEED                                                             READ ONLY
+     2 LABPDB                                                               READ WRITE
+
+
+   INST_ID NAME
+---------- --------------------------------------------------------------------------------
+VALUE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     1 cluster_database
+TRUE
+
+     2 cluster_database
+TRUE
+
+     1 pga_aggregate_target
+2147483648
+
+     2 pga_aggregate_target
+2147483648
+
+     1 sga_target
+3221225472
+
+     2 sga_target
+3221225472
+
+     1 use_large_pages
+FALSE
+
+     2 use_large_pages
+FALSE
+
+
+8 rows selected.
+
+
+    CON_ID   PATCH_ID ACTION          STATUS            DESCRIPTION
+---------- ---------- --------------- ------------------------- ----------------------------------------------------------------------------------------------------
+     1   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     1   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+     3   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     3   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+
+
+no rows selected
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+racnode1-0  1
+racnode2-0  2
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    102392    89616                0           89616              0             Y  DATA/
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39503034;ACFS RELEASE UPDATE 19.32.0.0.0 (39503034)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39107855;TOMCAT RELEASE UPDATE 19.0.0.0.0 (39107855)
+39107825;DBWLM RELEASE UPDATE 19.0.0.0.0 (39107825)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+NAME      OPEN_MODE        DATABASE_ROLE
+--------- -------------------- ----------------
+RACCDB    READ WRITE           PRIMARY
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 PDB$SEED                                                             READ ONLY
+     1 LABPDB                                                               READ WRITE
+     2 PDB$SEED                                                             READ ONLY
+     2 LABPDB                                                               READ WRITE
+
+
+   INST_ID NAME
+---------- --------------------------------------------------------------------------------
+VALUE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     1 cluster_database
+TRUE
+
+     2 cluster_database
+TRUE
+
+     1 pga_aggregate_target
+2147483648
+
+     2 pga_aggregate_target
+2147483648
+
+     1 sga_target
+3221225472
+
+     2 sga_target
+3221225472
+
+     1 use_large_pages
+FALSE
+
+     2 use_large_pages
+FALSE
+
+
+8 rows selected.
+
+
+    CON_ID   PATCH_ID ACTION          STATUS            DESCRIPTION
+---------- ---------- --------------- ------------------------- ----------------------------------------------------------------------------------------------------
+     1   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     1   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+     3   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     3   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+
+
+no rows selected
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DBLSNR.lsnr
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.chad
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.net1.network
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.ons
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.ASMNET1LSNR_ASM.lsnr(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.ASMNET2LSNR_ASM.lsnr(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.DATA.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.LISTENER_SCAN1.lsnr
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.LISTENER_SCAN2.lsnr
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+ora.asm(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               Started,STABLE
+      2        ONLINE  ONLINE       racnode2-0               Started,STABLE
+ora.asmnet1.asmnetwork(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.asmnet2.asmnetwork(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.cvu
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.raccdb.db
+      1        ONLINE  ONLINE       racnode1-0               Open,HOME=/u01/app/o
+                                                             racle/product/19c/db
+                                                             home_1,STABLE
+      2        ONLINE  ONLINE       racnode2-0               Open,HOME=/u01/app/o
+                                                             racle/product/19c/db
+                                                             home_1,STABLE
+ora.raccdb.labpdb_app.svc
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.racnode1-0.vip
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.racnode2-0.vip
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+ora.scan1.vip
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.scan2.vip
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+--------------------------------------------------------------------------------
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Instance RACCDB1 is running on node racnode1-0 with online services labpdb_app. Instance status: Open.
+Instance RACCDB2 is running on node racnode2-0 with online services labpdb_app. Instance status: Open.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Service labpdb_app is running on instance(s) RACCDB1,RACCDB2
+</code></pre>
+
+
+</details>
+
+<h2 id="node1-replacement-and-sql-acceptance">Node1 replacement and SQL acceptance</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Exercise-RAC-Pod1-Replacement-20261011-195656.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">
+UTC 2026-10-11T23:56:56.526856+00:00 $ kubectl exec -n rac racnode1-0 -- cat /u01/app/oracle/recovery-backups/manual-exercises-20261011/exit-code
+0
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:56:56.680789+00:00 $ kubectl get racdatabase rac19c -n rac -o json
+{
+    &quot;apiVersion&quot;: &quot;database.oracle.com/v4&quot;,
+    &quot;kind&quot;: &quot;RacDatabase&quot;,
+    &quot;metadata&quot;: {
+        &quot;annotations&quot;: {
+            &quot;kubectl.kubernetes.io/last-applied-configuration&quot;: &quot;{\&quot;apiVersion\&quot;:\&quot;database.oracle.com/v4\&quot;,\&quot;kind\&quot;:\&quot;RacDatabase\&quot;,\&quot;metadata\&quot;:{\&quot;annotations\&quot;:{},\&quot;name\&quot;:\&quot;rac19c\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;},\&quot;spec\&quot;:{\&quot;asmDiskGroupDetails\&quot;:[{\&quot;disks\&quot;:[\&quot;/dev/disk/by-partlabel/ocne-rac-asm01\&quot;,\&quot;/dev/disk/by-partlabel/ocne-rac-asm02\&quot;],\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;redundancy\&quot;:\&quot;EXTERNAL\&quot;,\&quot;type\&quot;:\&quot;CRSDG\&quot;}],\&quot;configParams\&quot;:{\&quot;cpuCount\&quot;:4,\&quot;dbBase\&quot;:\&quot;/u01/app/oracle\&quot;,\&quot;dbHome\&quot;:\&quot;/u01/app/oracle/product/19c/dbhome_1\&quot;,\&quot;dbName\&quot;:\&quot;RACCDB\&quot;,\&quot;dbSwZipFile\&quot;:\&quot;oracle-dbhome-19.32.zip\&quot;,\&quot;gridBase\&quot;:\&quot;/u01/app/grid\&quot;,\&quot;gridHome\&quot;:\&quot;/u01/app/19c/grid\&quot;,\&quot;gridSwZipFile\&quot;:\&quot;oracle-gridhome-19.32.zip\&quot;,\&quot;hostSwStageLocation\&quot;:\&quot;/scratch/software/stage/19c/19.32-gold\&quot;,\&quot;inventory\&quot;:\&quot;/u01/app/oraInventory\&quot;,\&quot;pdbName\&quot;:\&quot;LABPDB\&quot;,\&quot;pgaSize\&quot;:\&quot;2G\&quot;,\&quot;processes\&quot;:500,\&quot;sgaSize\&quot;:\&quot;3G\&quot;},\&quot;dbSecret\&quot;:{\&quot;encryptionType\&quot;:\&quot;pkeyutl\&quot;,\&quot;keyFileName\&quot;:\&quot;key.pem\&quot;,\&quot;name\&quot;:\&quot;rac-db-password\&quot;,\&quot;pkeyopt\&quot;:\&quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256\&quot;,\&quot;pwdFileName\&quot;:\&quot;pwdfile.enc\&quot;},\&quot;envVars\&quot;:[{\&quot;name\&quot;:\&quot;ORACLE_PDB_NAME\&quot;,\&quot;value\&quot;:\&quot;LABPDB\&quot;},{\&quot;name\&quot;:\&quot;LOG_DIR\&quot;,\&quot;value\&quot;:\&quot;/tmp/orod\&quot;},{\&quot;name\&quot;:\&quot;TOTAL_MEMORY\&quot;,\&quot;value\&quot;:\&quot;16384\&quot;}],\&quot;image\&quot;:\&quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d\&quot;,\&quot;imagePullPolicy\&quot;:\&quot;IfNotPresent\&quot;,\&quot;instanceDetails\&quot;:{\&quot;baseLsnrTargetPort\&quot;:31522,\&quot;baseOnsTargetPort\&quot;:30200,\&quot;nodeCount\&quot;:2,\&quot;privateIPDetails\&quot;:[{\&quot;interface\&quot;:\&quot;ens1\&quot;,\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;},{\&quot;interface\&quot;:\&quot;ens2\&quot;,\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;}],\&quot;racHostSwLocation\&quot;:\&quot;/scratch/rac/cluster01\&quot;,\&quot;racNodeName\&quot;:\&quot;racnode\&quot;,\&quot;workerNodeSelector\&quot;:{\&quot;raccluster\&quot;:\&quot;raccluster01\&quot;}},\&quot;resources\&quot;:{\&quot;limits\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;},\&quot;requests\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;}},\&quot;scanSvcName\&quot;:\&quot;racnode-scan\&quot;,\&quot;scanSvcTargetPort\&quot;:31521,\&quot;securityContext\&quot;:{\&quot;sysctls\&quot;:[{\&quot;name\&quot;:\&quot;kernel.shmall\&quot;,\&quot;value\&quot;:\&quot;2097152\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmax\&quot;,\&quot;value\&quot;:\&quot;8589934592\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmni\&quot;,\&quot;value\&quot;:\&quot;4096\&quot;},{\&quot;name\&quot;:\&quot;kernel.sem\&quot;,\&quot;value\&quot;:\&quot;250 32000 100 128\&quot;},{\&quot;name\&quot;:\&quot;net.ipv4.conf.all.rp_filter\&quot;,\&quot;value\&quot;:\&quot;2\&quot;}]},\&quot;serviceDetails\&quot;:{\&quot;name\&quot;:\&quot;labpdb\&quot;},\&quot;sshKeySecret\&quot;:{\&quot;name\&quot;:\&quot;rac-ssh-key\&quot;,\&quot;privKeySecretName\&quot;:\&quot;ssh-privkey\&quot;,\&quot;pubKeySecretName\&quot;:\&quot;ssh-pubkey\&quot;}}}\n&quot;,
+            &quot;racdatabases.database.oracle.com/old-spec&quot;: &quot;{\&quot;instanceDetails\&quot;:{\&quot;nodeCount\&quot;:2,\&quot;racHostSwLocation\&quot;:\&quot;/scratch/rac/cluster01\&quot;,\&quot;racNodeName\&quot;:\&quot;racnode\&quot;,\&quot;baseOnsTargetPort\&quot;:30200,\&quot;baseLsnrTargetPort\&quot;:31522,\&quot;privateIPDetails\&quot;:[{\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;,\&quot;interface\&quot;:\&quot;ens1\&quot;},{\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;,\&quot;interface\&quot;:\&quot;ens2\&quot;}],\&quot;workerNodeSelector\&quot;:{\&quot;raccluster\&quot;:\&quot;raccluster01\&quot;}},\&quot;configParams\&quot;:{\&quot;gridHome\&quot;:\&quot;/u01/app/19c/grid\&quot;,\&quot;dbHome\&quot;:\&quot;/u01/app/oracle/product/19c/dbhome_1\&quot;,\&quot;gridBase\&quot;:\&quot;/u01/app/grid\&quot;,\&quot;dbBase\&quot;:\&quot;/u01/app/oracle\&quot;,\&quot;inventory\&quot;:\&quot;/u01/app/oraInventory\&quot;,\&quot;gridSwZipFile\&quot;:\&quot;oracle-gridhome-19.32.zip\&quot;,\&quot;dbSwZipFile\&quot;:\&quot;oracle-dbhome-19.32.zip\&quot;,\&quot;cpuCount\&quot;:4,\&quot;sgaSize\&quot;:\&quot;3G\&quot;,\&quot;pgaSize\&quot;:\&quot;2G\&quot;,\&quot;processes\&quot;:500,\&quot;dbName\&quot;:\&quot;RACCDB\&quot;,\&quot;pdbName\&quot;:\&quot;LABPDB\&quot;,\&quot;dbCharSet\&quot;:\&quot;AL32UTF8\&quot;,\&quot;swMountLocation\&quot;:\&quot;/u01\&quot;,\&quot;hostSwStageLocation\&quot;:\&quot;/scratch/software/stage/19c/19.32-gold\&quot;},\&quot;asmDiskGroupDetails\&quot;:[{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;redundancy\&quot;:\&quot;EXTERNAL\&quot;,\&quot;type\&quot;:\&quot;CRSDG\&quot;,\&quot;disks\&quot;:[\&quot;/dev/disk/by-partlabel/ocne-rac-asm01\&quot;,\&quot;/dev/disk/by-partlabel/ocne-rac-asm02\&quot;]},{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;type\&quot;:\&quot;DBDATAFILESDG\&quot;,\&quot;disks\&quot;:null},{\&quot;name\&quot;:\&quot;DATA\&quot;,\&quot;type\&quot;:\&quot;DBRECOVERY\&quot;,\&quot;disks\&quot;:null}],\&quot;envVars\&quot;:[{\&quot;name\&quot;:\&quot;ORACLE_PDB_NAME\&quot;,\&quot;value\&quot;:\&quot;LABPDB\&quot;},{\&quot;name\&quot;:\&quot;LOG_DIR\&quot;,\&quot;value\&quot;:\&quot;/tmp/orod\&quot;},{\&quot;name\&quot;:\&quot;TOTAL_MEMORY\&quot;,\&quot;value\&quot;:\&quot;16384\&quot;}],\&quot;image\&quot;:\&quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d\&quot;,\&quot;sshKeySecret\&quot;:{\&quot;name\&quot;:\&quot;rac-ssh-key\&quot;,\&quot;keyMountLocation\&quot;:\&quot;/mnt/.ssh\&quot;,\&quot;privKeySecretName\&quot;:\&quot;ssh-privkey\&quot;,\&quot;pubKeySecretName\&quot;:\&quot;ssh-pubkey\&quot;},\&quot;imagePullPolicy\&quot;:\&quot;IfNotPresent\&quot;,\&quot;scanSvcName\&quot;:\&quot;racnode-scan\&quot;,\&quot;securityContext\&quot;:{\&quot;sysctls\&quot;:[{\&quot;name\&quot;:\&quot;kernel.shmall\&quot;,\&quot;value\&quot;:\&quot;2097152\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmax\&quot;,\&quot;value\&quot;:\&quot;8589934592\&quot;},{\&quot;name\&quot;:\&quot;kernel.shmmni\&quot;,\&quot;value\&quot;:\&quot;4096\&quot;},{\&quot;name\&quot;:\&quot;kernel.sem\&quot;,\&quot;value\&quot;:\&quot;250 32000 100 128\&quot;},{\&quot;name\&quot;:\&quot;net.ipv4.conf.all.rp_filter\&quot;,\&quot;value\&quot;:\&quot;2\&quot;}]},\&quot;scanSvcTargetPort\&quot;:31521,\&quot;dbSecret\&quot;:{\&quot;name\&quot;:\&quot;rac-db-password\&quot;,\&quot;keyFileName\&quot;:\&quot;key.pem\&quot;,\&quot;pwdFileName\&quot;:\&quot;pwdfile.enc\&quot;,\&quot;pwdFileMountLocation\&quot;:\&quot;/mnt/.dbsecrets\&quot;,\&quot;keyFileMountLocation\&quot;:\&quot;/mnt/.dbsecrets\&quot;,\&quot;encryptionType\&quot;:\&quot;pkeyutl\&quot;,\&quot;pkeyopt\&quot;:\&quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256\&quot;},\&quot;serviceDetails\&quot;:{\&quot;name\&quot;:\&quot;labpdb\&quot;},\&quot;resources\&quot;:{\&quot;limits\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;},\&quot;requests\&quot;:{\&quot;cpu\&quot;:\&quot;4\&quot;,\&quot;memory\&quot;:\&quot;16Gi\&quot;}}}&quot;
+        },
+        &quot;creationTimestamp&quot;: &quot;2026-10-11T02:14:00Z&quot;,
+        &quot;finalizers&quot;: [
+            &quot;database.oracle.com/racdatabasefinalizer&quot;
+        ],
+        &quot;generation&quot;: 3,
+        &quot;name&quot;: &quot;rac19c&quot;,
+        &quot;namespace&quot;: &quot;rac&quot;,
+        &quot;resourceVersion&quot;: &quot;389843&quot;,
+        &quot;uid&quot;: &quot;6be9de9e-f884-4b82-848b-52eadd7213d1&quot;
+    },
+    &quot;spec&quot;: {
+        &quot;asmDiskGroupDetails&quot;: [
+            {
+                &quot;disks&quot;: [
+                    &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                    &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                ],
+                &quot;name&quot;: &quot;DATA&quot;,
+                &quot;redundancy&quot;: &quot;EXTERNAL&quot;,
+                &quot;type&quot;: &quot;CRSDG&quot;
+            }
+        ],
+        &quot;configParams&quot;: {
+            &quot;cpuCount&quot;: 4,
+            &quot;dbBase&quot;: &quot;/u01/app/oracle&quot;,
+            &quot;dbHome&quot;: &quot;/u01/app/oracle/product/19c/dbhome_1&quot;,
+            &quot;dbName&quot;: &quot;RACCDB&quot;,
+            &quot;dbSwZipFile&quot;: &quot;oracle-dbhome-19.32.zip&quot;,
+            &quot;gridBase&quot;: &quot;/u01/app/grid&quot;,
+            &quot;gridHome&quot;: &quot;/u01/app/19c/grid&quot;,
+            &quot;gridSwZipFile&quot;: &quot;oracle-gridhome-19.32.zip&quot;,
+            &quot;hostSwStageLocation&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+            &quot;inventory&quot;: &quot;/u01/app/oraInventory&quot;,
+            &quot;pdbName&quot;: &quot;LABPDB&quot;,
+            &quot;pgaSize&quot;: &quot;2G&quot;,
+            &quot;processes&quot;: 500,
+            &quot;sgaSize&quot;: &quot;3G&quot;,
+            &quot;swMountLocation&quot;: &quot;/u01&quot;
+        },
+        &quot;dbSecret&quot;: {
+            &quot;encryptionType&quot;: &quot;pkeyutl&quot;,
+            &quot;keyFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;keyFileName&quot;: &quot;key.pem&quot;,
+            &quot;name&quot;: &quot;rac-db-password&quot;,
+            &quot;pkeyopt&quot;: &quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256&quot;,
+            &quot;pwdFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;pwdFileName&quot;: &quot;pwdfile.enc&quot;
+        },
+        &quot;envVars&quot;: [
+            {
+                &quot;name&quot;: &quot;ORACLE_PDB_NAME&quot;,
+                &quot;value&quot;: &quot;LABPDB&quot;
+            },
+            {
+                &quot;name&quot;: &quot;LOG_DIR&quot;,
+                &quot;value&quot;: &quot;/tmp/orod&quot;
+            },
+            {
+                &quot;name&quot;: &quot;TOTAL_MEMORY&quot;,
+                &quot;value&quot;: &quot;16384&quot;
+            }
+        ],
+        &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+        &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+        &quot;instanceDetails&quot;: {
+            &quot;baseLsnrTargetPort&quot;: 31522,
+            &quot;baseOnsTargetPort&quot;: 30200,
+            &quot;nodeCount&quot;: 2,
+            &quot;privateIPDetails&quot;: [
+                {
+                    &quot;interface&quot;: &quot;ens1&quot;,
+                    &quot;name&quot;: &quot;macvlan-conf1&quot;
+                },
+                {
+                    &quot;interface&quot;: &quot;ens2&quot;,
+                    &quot;name&quot;: &quot;macvlan-conf2&quot;
+                }
+            ],
+            &quot;racHostSwLocation&quot;: &quot;/scratch/rac/cluster01&quot;,
+            &quot;racNodeName&quot;: &quot;racnode&quot;,
+            &quot;workerNodeSelector&quot;: {
+                &quot;raccluster&quot;: &quot;raccluster01&quot;
+            }
+        },
+        &quot;resources&quot;: {
+            &quot;limits&quot;: {
+                &quot;cpu&quot;: &quot;4&quot;,
+                &quot;memory&quot;: &quot;16Gi&quot;
+            },
+            &quot;requests&quot;: {
+                &quot;cpu&quot;: &quot;4&quot;,
+                &quot;memory&quot;: &quot;16Gi&quot;
+            }
+        },
+        &quot;scanSvcName&quot;: &quot;racnode-scan&quot;,
+        &quot;scanSvcTargetPort&quot;: 31521,
+        &quot;securityContext&quot;: {
+            &quot;sysctls&quot;: [
+                {
+                    &quot;name&quot;: &quot;kernel.shmall&quot;,
+                    &quot;value&quot;: &quot;2097152&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmax&quot;,
+                    &quot;value&quot;: &quot;8589934592&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmni&quot;,
+                    &quot;value&quot;: &quot;4096&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.sem&quot;,
+                    &quot;value&quot;: &quot;250 32000 100 128&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.all.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                }
+            ]
+        },
+        &quot;serviceDetails&quot;: {
+            &quot;name&quot;: &quot;labpdb&quot;
+        },
+        &quot;sshKeySecret&quot;: {
+            &quot;keyMountLocation&quot;: &quot;/mnt/.ssh&quot;,
+            &quot;name&quot;: &quot;rac-ssh-key&quot;,
+            &quot;privKeySecretName&quot;: &quot;ssh-privkey&quot;,
+            &quot;pubKeySecretName&quot;: &quot;ssh-pubkey&quot;
+        }
+    },
+    &quot;status&quot;: {
+        &quot;asmDiskGroups&quot;: [
+            {
+                &quot;disks&quot;: [
+                    {
+                        &quot;name&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;sizeInGb&quot;: 49,
+                        &quot;valid&quot;: true
+                    },
+                    {
+                        &quot;name&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;,
+                        &quot;sizeInGb&quot;: 49,
+                        &quot;valid&quot;: true
+                    }
+                ],
+                &quot;name&quot;: &quot;DATA&quot;,
+                &quot;redundancy&quot;: &quot;EXTERN&quot;,
+                &quot;type&quot;: &quot;CRSDG&quot;
+            }
+        ],
+        &quot;clientEtcHost&quot;: [
+            &quot;192.168.77.12    racnode1-0.rac.svc.cluster.local racnode1-0-vip.rac.svc.cluster.local    racnode-scan.rac.svc.cluster.local&quot;,
+            &quot;192.168.77.13    racnode2-0.rac.svc.cluster.local racnode2-0-vip.rac.svc.cluster.local    racnode-scan.rac.svc.cluster.local&quot;
+        ],
+        &quot;conditions&quot;: [
+            {
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T23:56:19Z&quot;,
+                &quot;message&quot;: &quot;no reconcile errors&quot;,
+                &quot;observedGeneration&quot;: 3,
+                &quot;reason&quot;: &quot;LastReconcileCycleCompleted&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ReconcileComplete&quot;
+            },
+            {
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:16Z&quot;,
+                &quot;message&quot;: &quot;RAC pods pending: [racnode1-0]&quot;,
+                &quot;observedGeneration&quot;: 1,
+                &quot;reason&quot;: &quot;LastReconcileCycleWaiting&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ReconcileWaiting&quot;
+            }
+        ],
+        &quot;configParams&quot;: {
+            &quot;dbBase&quot;: &quot;/u01/app/oracle&quot;,
+            &quot;dbHome&quot;: &quot;/u01/app/oracle/product/19c/dbhome_1&quot;,
+            &quot;dbName&quot;: &quot;RACCDB&quot;,
+            &quot;gridBase&quot;: &quot;/u01/app/grid&quot;,
+            &quot;gridHome&quot;: &quot;/u01/app/19c/grid&quot;,
+            &quot;inventory&quot;: &quot;/u01/app/oraInventory&quot;
+        },
+        &quot;connectString&quot;: &quot;racnode-scan:1521/RACCDB&quot;,
+        &quot;dbSecret&quot;: {
+            &quot;encryptionType&quot;: &quot;pkeyutl&quot;,
+            &quot;keyFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;keyFileName&quot;: &quot;key.pem&quot;,
+            &quot;name&quot;: &quot;rac-db-password&quot;,
+            &quot;pkeyopt&quot;: &quot;rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256&quot;,
+            &quot;pwdFileMountLocation&quot;: &quot;/mnt/.dbsecrets&quot;,
+            &quot;pwdFileName&quot;: &quot;pwdfile.enc&quot;
+        },
+        &quot;dbState&quot;: &quot;OPEN&quot;,
+        &quot;externalConnectString&quot;: &quot;racnode-scan.rac.svc.cluster.local:31521/labpdb&quot;,
+        &quot;observedGeneration&quot;: 3,
+        &quot;pdbConnectString&quot;: &quot;racnode-scan:1521/ORCLPDB&quot;,
+        &quot;racNodes&quot;: [
+            {
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;nodeDetails&quot;: {
+                    &quot;InstanceState&quot;: &quot;OPEN&quot;,
+                    &quot;PodState&quot;: &quot;AVAILABLE&quot;,
+                    &quot;clusterState&quot;: &quot;HEALTHY&quot;,
+                    &quot;mountedDevices&quot;: [
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                    ],
+                    &quot;state&quot;: &quot;AVAILABLE&quot;,
+                    &quot;vipDetails&quot;: {
+                        &quot;Name&quot;: &quot;racnode1-0-vip&quot;
+                    }
+                }
+            },
+            {
+                &quot;name&quot;: &quot;racnode2-0&quot;,
+                &quot;nodeDetails&quot;: {
+                    &quot;InstanceState&quot;: &quot;OPEN&quot;,
+                    &quot;PodState&quot;: &quot;AVAILABLE&quot;,
+                    &quot;clusterState&quot;: &quot;HEALTHY&quot;,
+                    &quot;mountedDevices&quot;: [
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;
+                    ],
+                    &quot;state&quot;: &quot;AVAILABLE&quot;,
+                    &quot;vipDetails&quot;: {
+                        &quot;Name&quot;: &quot;racnode2-0-vip&quot;
+                    }
+                }
+            }
+        ],
+        &quot;releaseUpdate&quot;: &quot;19.32.0.0.0&quot;,
+        &quot;role&quot;: &quot;PRIMARY&quot;,
+        &quot;scanSvcName&quot;: &quot;racnode-scan&quot;,
+        &quot;serviceDetails&quot;: {
+            &quot;name&quot;: &quot;labpdb&quot;,
+            &quot;svcState&quot;: &quot;prcr-1001 : resource ora.raccdb.labpdb.svc does not exist&quot;
+        },
+        &quot;state&quot;: &quot;AVAILABLE&quot;
+    }
+}
+Exit code: 0
+
+UTC 2026-10-11T23:56:56.750432+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '&quot;'&quot;'/ as sysdba'&quot;'&quot;''
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 LABPDB                                                               READ WRITE
+     2 LABPDB                                                               READ WRITE
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:56:57.098164+00:00 $ kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status service -db RACCDB'
+Service labpdb_app is running on instance(s) RACCDB1,RACCDB2
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:56:57.968109+00:00 $ kubectl -n rac get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE    IP            NODE               NOMINATED NODE   READINESS GATES
+racnode1-0   1/1     Running   0          21h    10.244.1.9    ocne-w1.lab.test   &lt;none&gt;           &lt;none&gt;
+racnode2-0   1/1     Running   0          7m3s   10.244.2.10   ocne-w2.lab.test   &lt;none&gt;           &lt;none&gt;
+Exit code: 0
+
+UTC 2026-10-11T23:56:58.035777+00:00 $ kubectl exec -i -n rac racnode2-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s /nolog'
+
+PDB          INSTANCE_NAME
+-------------------- --------------------
+LABPDB           RACCDB2
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:56:58.574995+00:00 $ kubectl -n rac get pod racnode1-0 -o json
+{
+    &quot;apiVersion&quot;: &quot;v1&quot;,
+    &quot;kind&quot;: &quot;Pod&quot;,
+    &quot;metadata&quot;: {
+        &quot;annotations&quot;: {
+            &quot;database.oracle.com/rac-configmap-hash&quot;: &quot;e846a808193d5b3cf7ab3f4f150cec01e551b515fddd5d3b5826364bc79acf66&quot;,
+            &quot;k8s.v1.cni.cncf.io/network-status&quot;: &quot;[{\n    \&quot;name\&quot;: \&quot;cbr0\&quot;,\n    \&quot;interface\&quot;: \&quot;eth0\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;10.244.1.9\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;02:ef:c7:1b:43:53\&quot;,\n    \&quot;default\&quot;: true,\n    \&quot;dns\&quot;: {},\n    \&quot;gateway\&quot;: [\n        \&quot;10.244.1.1\&quot;\n    ]\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf1\&quot;,\n    \&quot;interface\&quot;: \&quot;ens1\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.78.120\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;4e:23:e2:a7:c4:8a\&quot;,\n    \&quot;dns\&quot;: {}\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf2\&quot;,\n    \&quot;interface\&quot;: \&quot;ens2\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.79.120\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;2a:77:78:7e:4e:b4\&quot;,\n    \&quot;dns\&quot;: {}\n}]&quot;,
+            &quot;k8s.v1.cni.cncf.io/networks&quot;: &quot;[{\&quot;interface\&quot;:\&quot;ens1\&quot;,\&quot;ips\&quot;:[\&quot;192.168.78.120/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;},{\&quot;interface\&quot;:\&quot;ens2\&quot;,\&quot;ips\&quot;:[\&quot;192.168.79.120/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;}]&quot;
+        },
+        &quot;creationTimestamp&quot;: &quot;2026-10-11T02:14:16Z&quot;,
+        &quot;generateName&quot;: &quot;racnode1-&quot;,
+        &quot;labels&quot;: {
+            &quot;app&quot;: &quot;oracle-database-operator&quot;,
+            &quot;apps.kubernetes.io/pod-index&quot;: &quot;0&quot;,
+            &quot;controller-revision-hash&quot;: &quot;racnode1-774b859879&quot;,
+            &quot;database.oracle.com/component&quot;: &quot;RAC&quot;,
+            &quot;database.oracle.com/managed-by&quot;: &quot;racdatabase-controller&quot;,
+            &quot;database.oracle.com/name&quot;: &quot;rac19c&quot;,
+            &quot;statefulset.kubernetes.io/pod-name&quot;: &quot;racnode1-0&quot;
+        },
+        &quot;name&quot;: &quot;racnode1-0&quot;,
+        &quot;namespace&quot;: &quot;rac&quot;,
+        &quot;ownerReferences&quot;: [
+            {
+                &quot;apiVersion&quot;: &quot;apps/v1&quot;,
+                &quot;blockOwnerDeletion&quot;: true,
+                &quot;controller&quot;: true,
+                &quot;kind&quot;: &quot;StatefulSet&quot;,
+                &quot;name&quot;: &quot;racnode1&quot;,
+                &quot;uid&quot;: &quot;d3987707-1668-494f-885f-864301da3cb4&quot;
+            }
+        ],
+        &quot;resourceVersion&quot;: &quot;315468&quot;,
+        &quot;uid&quot;: &quot;0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4&quot;
+    },
+    &quot;spec&quot;: {
+        &quot;affinity&quot;: {
+            &quot;nodeAffinity&quot;: {
+                &quot;requiredDuringSchedulingIgnoredDuringExecution&quot;: {
+                    &quot;nodeSelectorTerms&quot;: [
+                        {
+                            &quot;matchExpressions&quot;: [
+                                {
+                                    &quot;key&quot;: &quot;raccluster&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;raccluster01&quot;
+                                    ]
+                                },
+                                {
+                                    &quot;key&quot;: &quot;kubernetes.io/hostname&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;ocne-w1.lab.test&quot;
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        &quot;containers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/usr/sbin/init&quot;
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;ports&quot;: [
+                    {
+                        &quot;containerPort&quot;: 1521,
+                        &quot;name&quot;: &quot;tcp-1521lv5bb&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 1522,
+                        &quot;name&quot;: &quot;tcp-1522gtk9k&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 22,
+                        &quot;name&quot;: &quot;tcp-22hct82&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 6200,
+                        &quot;name&quot;: &quot;tcp-6200nbrd7&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 8080,
+                        &quot;name&quot;: &quot;tcp-8080pmc4d&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 31522,
+                        &quot;name&quot;: &quot;tcp-31522vggpw&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 30200,
+                        &quot;name&quot;: &quot;tcp-30200k6cr8&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    }
+                ],
+                &quot;readinessProbe&quot;: {
+                    &quot;failureThreshold&quot;: 3,
+                    &quot;initialDelaySeconds&quot;: 180,
+                    &quot;periodSeconds&quot;: 5,
+                    &quot;successThreshold&quot;: 1,
+                    &quot;tcpSocket&quot;: {
+                        &quot;port&quot;: 31522
+                    },
+                    &quot;timeoutSeconds&quot;: 1
+                },
+                &quot;resources&quot;: {
+                    &quot;limits&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    },
+                    &quot;requests&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    }
+                },
+                &quot;securityContext&quot;: {
+                    &quot;capabilities&quot;: {
+                        &quot;add&quot;: [
+                            &quot;NET_ADMIN&quot;,
+                            &quot;SYS_NICE&quot;,
+                            &quot;SYS_RESOURCE&quot;,
+                            &quot;AUDIT_WRITE&quot;,
+                            &quot;NET_RAW&quot;,
+                            &quot;AUDIT_CONTROL&quot;,
+                            &quot;SYS_CHROOT&quot;
+                        ]
+                    },
+                    &quot;privileged&quot;: false
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeDevices&quot;: [
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                    },
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                    }
+                ],
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-fvzfp&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;dnsPolicy&quot;: &quot;ClusterFirst&quot;,
+        &quot;enableServiceLinks&quot;: true,
+        &quot;hostname&quot;: &quot;racnode1-0&quot;,
+        &quot;initContainers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/bin/bash&quot;,
+                    &quot;-c&quot;,
+                    &quot;\n\t\tsysctl -w net.ipv4.conf.all.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.default.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens1.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens2.rp_filter=2 || true \u0026\u0026\n\n\t\tIP1=$(ip addr show ens1 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\t\tIP2=$(ip addr show ens2 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\n\t\t# Write environment file (overwrite + append)\n\t\tif [ -n \&quot;$IP1\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP1=$IP1\&quot; \u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t\tif [ -n \&quot;$IP2\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP2=$IP2\&quot; \u003e\u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t/bin/true&quot;
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode1-init1&quot;,
+                &quot;resources&quot;: {},
+                &quot;securityContext&quot;: {
+                    &quot;privileged&quot;: true,
+                    &quot;runAsUser&quot;: 0
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-fvzfp&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;nodeName&quot;: &quot;ocne-w1.lab.test&quot;,
+        &quot;preemptionPolicy&quot;: &quot;PreemptLowerPriority&quot;,
+        &quot;priority&quot;: 0,
+        &quot;restartPolicy&quot;: &quot;Always&quot;,
+        &quot;schedulerName&quot;: &quot;default-scheduler&quot;,
+        &quot;securityContext&quot;: {
+            &quot;sysctls&quot;: [
+                {
+                    &quot;name&quot;: &quot;kernel.shmall&quot;,
+                    &quot;value&quot;: &quot;786432&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmax&quot;,
+                    &quot;value&quot;: &quot;3221225472&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmni&quot;,
+                    &quot;value&quot;: &quot;4096&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.sem&quot;,
+                    &quot;value&quot;: &quot;250 32000 100 128&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.all.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.default.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                }
+            ]
+        },
+        &quot;serviceAccount&quot;: &quot;default&quot;,
+        &quot;serviceAccountName&quot;: &quot;default&quot;,
+        &quot;subdomain&quot;: &quot;racnode&quot;,
+        &quot;terminationGracePeriodSeconds&quot;: 30,
+        &quot;tolerations&quot;: [
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/not-ready&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            },
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/unreachable&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            }
+        ],
+        &quot;volumes&quot;: [
+            {
+                &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-ssh-key&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {
+                    &quot;medium&quot;: &quot;Memory&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-db-password&quot;
+                }
+            },
+            {
+                &quot;configMap&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;name&quot;: &quot;racnode1rac19c-cmap&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/rac/cluster01/racnode1&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                }
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {},
+                &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+            },
+            {
+                &quot;name&quot;: &quot;kube-api-access-fvzfp&quot;,
+                &quot;projected&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;sources&quot;: [
+                        {
+                            &quot;serviceAccountToken&quot;: {
+                                &quot;expirationSeconds&quot;: 3607,
+                                &quot;path&quot;: &quot;token&quot;
+                            }
+                        },
+                        {
+                            &quot;configMap&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;key&quot;: &quot;ca.crt&quot;,
+                                        &quot;path&quot;: &quot;ca.crt&quot;
+                                    }
+                                ],
+                                &quot;name&quot;: &quot;kube-root-ca.crt&quot;
+                            }
+                        },
+                        {
+                            &quot;downwardAPI&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;fieldRef&quot;: {
+                                            &quot;apiVersion&quot;: &quot;v1&quot;,
+                                            &quot;fieldPath&quot;: &quot;metadata.namespace&quot;
+                                        },
+                                        &quot;path&quot;: &quot;namespace&quot;
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    &quot;status&quot;: {
+        &quot;conditions&quot;: [
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodReadyToStartContainers&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Initialized&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:52Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Ready&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:52Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ContainersReady&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:21Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodScheduled&quot;
+            }
+        ],
+        &quot;containerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://6f25dbe62dbbb4071eed939d37b5981f50bc56b7ac61d93707b0607493f8d360&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: true,
+                &quot;state&quot;: {
+                    &quot;running&quot;: {
+                        &quot;startedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;hostIP&quot;: &quot;192.168.77.12&quot;,
+        &quot;hostIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;192.168.77.12&quot;
+            }
+        ],
+        &quot;initContainerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://21e5dc8fd970e47d760706429258bf58199d1c9724601de5fc4f801143a820bd&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode1-init1&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: false,
+                &quot;state&quot;: {
+                    &quot;terminated&quot;: {
+                        &quot;containerID&quot;: &quot;cri-o://21e5dc8fd970e47d760706429258bf58199d1c9724601de5fc4f801143a820bd&quot;,
+                        &quot;exitCode&quot;: 0,
+                        &quot;finishedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+                        &quot;reason&quot;: &quot;Completed&quot;,
+                        &quot;startedAt&quot;: &quot;2026-10-11T02:14:22Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;phase&quot;: &quot;Running&quot;,
+        &quot;podIP&quot;: &quot;10.244.1.9&quot;,
+        &quot;podIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;10.244.1.9&quot;
+            }
+        ],
+        &quot;qosClass&quot;: &quot;Burstable&quot;,
+        &quot;startTime&quot;: &quot;2026-10-11T02:14:21Z&quot;
+    }
+}
+Exit code: 0
+
+UTC 2026-10-11T23:56:58.644682+00:00 $ kubectl exec -n rac racnode1-0 -- cmp /etc/oracle/olr.loc /u01/app/grid/.etcoraclebackup/oracle/olr.loc
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-11T23:56:58.787940+00:00 $ kubectl exec -n rac racnode1-0 -- cmp /etc/oracle/ocr.loc /u01/app/grid/.etcoraclebackup/oracle/ocr.loc
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+SCENARIO S07: normal replacement of racnode1-0; old UID=0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4
+
+UTC 2026-10-11T23:56:58.934215+00:00 $ kubectl -n rac delete pod racnode1-0 --grace-period=120 --wait=false
+pod &quot;racnode1-0&quot; deleted
+Exit code: 0
+2026-10-11T23:56:59.134489+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:57:14.222462+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:57:29.317925+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:57:44.388790+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:57:59.470686+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:58:14.552445+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:58:29.637050+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:58:44.719321+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Running Ready=True deleting=True
+2026-10-11T23:58:59.834582+00:00 racnode1-0 0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4 Failed Ready=False deleting=True
+2026-10-11T23:59:14.930130+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-11T23:59:30.027144+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-11T23:59:45.123457+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:00:00.202830+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:00:15.291030+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:00:30.376206+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:00:45.466949+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:01:00.555760+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:01:15.635616+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:01:30.718005+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:01:45.799144+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:02:00.885089+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=False deleting=False
+2026-10-12T00:02:15.954535+00:00 racnode1-0 590e8b8f-3a93-43d1-a8ea-3549e6b83201 Running Ready=True deleting=False
+
+UTC 2026-10-12T00:02:15.954619+00:00 $ kubectl -n rac get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE     IP            NODE               NOMINATED NODE   READINESS GATES
+racnode1-0   1/1     Running   0          3m16s   10.244.1.11   ocne-w1.lab.test   &lt;none&gt;           &lt;none&gt;
+racnode2-0   1/1     Running   0          12m     10.244.2.10   ocne-w2.lab.test   &lt;none&gt;           &lt;none&gt;
+Exit code: 0
+
+UTC 2026-10-12T00:02:16.013355+00:00 $ kubectl exec -n rac racnode1-0 -- /u01/app/19c/grid/bin/crsctl check crs
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-12T00:02:16.209979+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '&quot;'&quot;'/ as sysdba'&quot;'&quot;''
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 LABPDB                                                               READ WRITE
+     2 LABPDB                                                               READ WRITE
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-12T00:02:16.605875+00:00 $ kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status service -db RACCDB'
+Service labpdb_app is running on instance(s) RACCDB1,RACCDB2
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-12T00:02:17.442051+00:00 $ kubectl -n rac get pods -o wide
+NAME         READY   STATUS    RESTARTS   AGE     IP            NODE               NOMINATED NODE   READINESS GATES
+racnode1-0   1/1     Running   0          3m17s   10.244.1.11   ocne-w1.lab.test   &lt;none&gt;           &lt;none&gt;
+racnode2-0   1/1     Running   0          12m     10.244.2.10   ocne-w2.lab.test   &lt;none&gt;           &lt;none&gt;
+Exit code: 0
+
+UTC 2026-10-12T00:02:17.508728+00:00 $ kubectl exec -i -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s /nolog'
+
+PDB          INSTANCE_NAME
+-------------------- --------------------
+LABPDB           RACCDB1
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+UTC 2026-10-12T00:02:17.868913+00:00 $ kubectl exec -i -n rac racnode2-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s /nolog'
+
+PDB          INSTANCE_NAME
+-------------------- --------------------
+LABPDB           RACCDB2
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+UTC 2026-10-12T00:02:18.236822+00:00 $ kubectl -n rac get pod racnode1-0 -o json
+{
+    &quot;apiVersion&quot;: &quot;v1&quot;,
+    &quot;kind&quot;: &quot;Pod&quot;,
+    &quot;metadata&quot;: {
+        &quot;annotations&quot;: {
+            &quot;database.oracle.com/rac-configmap-hash&quot;: &quot;e846a808193d5b3cf7ab3f4f150cec01e551b515fddd5d3b5826364bc79acf66&quot;,
+            &quot;k8s.v1.cni.cncf.io/network-status&quot;: &quot;[{\n    \&quot;name\&quot;: \&quot;cbr0\&quot;,\n    \&quot;interface\&quot;: \&quot;eth0\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;10.244.1.11\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;7a:ef:9a:c6:9c:4d\&quot;,\n    \&quot;default\&quot;: true,\n    \&quot;dns\&quot;: {},\n    \&quot;gateway\&quot;: [\n        \&quot;10.244.1.1\&quot;\n    ]\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf1\&quot;,\n    \&quot;interface\&quot;: \&quot;ens1\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.78.120\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;f2:65:3e:37:20:4a\&quot;,\n    \&quot;dns\&quot;: {}\n},{\n    \&quot;name\&quot;: \&quot;rac/macvlan-conf2\&quot;,\n    \&quot;interface\&quot;: \&quot;ens2\&quot;,\n    \&quot;ips\&quot;: [\n        \&quot;192.168.79.120\&quot;\n    ],\n    \&quot;mac\&quot;: \&quot;2e:60:46:ac:c8:96\&quot;,\n    \&quot;dns\&quot;: {}\n}]&quot;,
+            &quot;k8s.v1.cni.cncf.io/networks&quot;: &quot;[{\&quot;interface\&quot;:\&quot;ens1\&quot;,\&quot;ips\&quot;:[\&quot;192.168.78.120/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf1\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;},{\&quot;interface\&quot;:\&quot;ens2\&quot;,\&quot;ips\&quot;:[\&quot;192.168.79.120/24\&quot;],\&quot;name\&quot;:\&quot;macvlan-conf2\&quot;,\&quot;namespace\&quot;:\&quot;rac\&quot;}]&quot;
+        },
+        &quot;creationTimestamp&quot;: &quot;2026-10-11T23:59:00Z&quot;,
+        &quot;generateName&quot;: &quot;racnode1-&quot;,
+        &quot;labels&quot;: {
+            &quot;app&quot;: &quot;oracle-database-operator&quot;,
+            &quot;apps.kubernetes.io/pod-index&quot;: &quot;0&quot;,
+            &quot;controller-revision-hash&quot;: &quot;racnode1-6d89d8bc59&quot;,
+            &quot;database.oracle.com/component&quot;: &quot;RAC&quot;,
+            &quot;database.oracle.com/managed-by&quot;: &quot;racdatabase-controller&quot;,
+            &quot;database.oracle.com/name&quot;: &quot;rac19c&quot;,
+            &quot;statefulset.kubernetes.io/pod-name&quot;: &quot;racnode1-0&quot;
+        },
+        &quot;name&quot;: &quot;racnode1-0&quot;,
+        &quot;namespace&quot;: &quot;rac&quot;,
+        &quot;ownerReferences&quot;: [
+            {
+                &quot;apiVersion&quot;: &quot;apps/v1&quot;,
+                &quot;blockOwnerDeletion&quot;: true,
+                &quot;controller&quot;: true,
+                &quot;kind&quot;: &quot;StatefulSet&quot;,
+                &quot;name&quot;: &quot;racnode1&quot;,
+                &quot;uid&quot;: &quot;d3987707-1668-494f-885f-864301da3cb4&quot;
+            }
+        ],
+        &quot;resourceVersion&quot;: &quot;390696&quot;,
+        &quot;uid&quot;: &quot;590e8b8f-3a93-43d1-a8ea-3549e6b83201&quot;
+    },
+    &quot;spec&quot;: {
+        &quot;affinity&quot;: {
+            &quot;nodeAffinity&quot;: {
+                &quot;requiredDuringSchedulingIgnoredDuringExecution&quot;: {
+                    &quot;nodeSelectorTerms&quot;: [
+                        {
+                            &quot;matchExpressions&quot;: [
+                                {
+                                    &quot;key&quot;: &quot;raccluster&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;raccluster01&quot;
+                                    ]
+                                },
+                                {
+                                    &quot;key&quot;: &quot;kubernetes.io/hostname&quot;,
+                                    &quot;operator&quot;: &quot;In&quot;,
+                                    &quot;values&quot;: [
+                                        &quot;ocne-w1.lab.test&quot;
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        &quot;containers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/usr/sbin/init&quot;
+                ],
+                &quot;env&quot;: [
+                    {
+                        &quot;name&quot;: &quot;ORACLE_PDB_NAME&quot;,
+                        &quot;value&quot;: &quot;LABPDB&quot;
+                    },
+                    {
+                        &quot;name&quot;: &quot;LOG_DIR&quot;,
+                        &quot;value&quot;: &quot;/tmp/orod&quot;
+                    },
+                    {
+                        &quot;name&quot;: &quot;TOTAL_MEMORY&quot;,
+                        &quot;value&quot;: &quot;16384&quot;
+                    }
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;ports&quot;: [
+                    {
+                        &quot;containerPort&quot;: 1521,
+                        &quot;name&quot;: &quot;tcp-1521lv5bb&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 1522,
+                        &quot;name&quot;: &quot;tcp-1522gtk9k&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 22,
+                        &quot;name&quot;: &quot;tcp-22hct82&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 6200,
+                        &quot;name&quot;: &quot;tcp-6200nbrd7&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 8080,
+                        &quot;name&quot;: &quot;tcp-8080pmc4d&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 31522,
+                        &quot;name&quot;: &quot;tcp-31522vggpw&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    },
+                    {
+                        &quot;containerPort&quot;: 30200,
+                        &quot;name&quot;: &quot;tcp-30200k6cr8&quot;,
+                        &quot;protocol&quot;: &quot;TCP&quot;
+                    }
+                ],
+                &quot;readinessProbe&quot;: {
+                    &quot;failureThreshold&quot;: 3,
+                    &quot;initialDelaySeconds&quot;: 180,
+                    &quot;periodSeconds&quot;: 5,
+                    &quot;successThreshold&quot;: 1,
+                    &quot;tcpSocket&quot;: {
+                        &quot;port&quot;: 31522
+                    },
+                    &quot;timeoutSeconds&quot;: 1
+                },
+                &quot;resources&quot;: {
+                    &quot;limits&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    },
+                    &quot;requests&quot;: {
+                        &quot;cpu&quot;: &quot;4&quot;,
+                        &quot;memory&quot;: &quot;16Gi&quot;
+                    }
+                },
+                &quot;securityContext&quot;: {
+                    &quot;capabilities&quot;: {
+                        &quot;add&quot;: [
+                            &quot;NET_ADMIN&quot;,
+                            &quot;SYS_NICE&quot;,
+                            &quot;SYS_RESOURCE&quot;,
+                            &quot;AUDIT_WRITE&quot;,
+                            &quot;NET_RAW&quot;,
+                            &quot;AUDIT_CONTROL&quot;,
+                            &quot;SYS_CHROOT&quot;
+                        ]
+                    },
+                    &quot;privileged&quot;: false
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeDevices&quot;: [
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm01&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                    },
+                    {
+                        &quot;devicePath&quot;: &quot;/dev/disk/by-partlabel/ocne-rac-asm02&quot;,
+                        &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                    }
+                ],
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-4b4rz&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;dnsPolicy&quot;: &quot;ClusterFirst&quot;,
+        &quot;enableServiceLinks&quot;: true,
+        &quot;hostname&quot;: &quot;racnode1-0&quot;,
+        &quot;initContainers&quot;: [
+            {
+                &quot;command&quot;: [
+                    &quot;/bin/bash&quot;,
+                    &quot;-c&quot;,
+                    &quot;\n\t\tsysctl -w net.ipv4.conf.all.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.default.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens1.rp_filter=2 || true \u0026\u0026\n\t\tsysctl -w net.ipv4.conf.ens2.rp_filter=2 || true \u0026\u0026\n\n\t\tIP1=$(ip addr show ens1 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\t\tIP2=$(ip addr show ens2 | awk '/inet /{print $2}' | cut -d/ -f1) \u0026\u0026 \n\n\t\t# Write environment file (overwrite + append)\n\t\tif [ -n \&quot;$IP1\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP1=$IP1\&quot; \u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t\tif [ -n \&quot;$IP2\&quot; ]; then\n\t\t\techo \&quot;CRS_PRIVATE_IP2=$IP2\&quot; \u003e\u003e /etc/rac_env_vars_writable/envfile;\n\t\tfi;\n\n\t/bin/true&quot;
+                ],
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d&quot;,
+                &quot;imagePullPolicy&quot;: &quot;IfNotPresent&quot;,
+                &quot;name&quot;: &quot;racnode1-init1&quot;,
+                &quot;resources&quot;: {},
+                &quot;securityContext&quot;: {
+                    &quot;privileged&quot;: true,
+                    &quot;runAsUser&quot;: 0
+                },
+                &quot;terminationMessagePath&quot;: &quot;/dev/termination-log&quot;,
+                &quot;terminationMessagePolicy&quot;: &quot;File&quot;,
+                &quot;volumeMounts&quot;: [
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.ssh&quot;,
+                        &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/.dbsecrets&quot;,
+                        &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                        &quot;readOnly&quot;: true
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/dev/shm&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/etc/rac_env_vars_writable&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/u01&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/mnt/stage/software&quot;,
+                        &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+                    },
+                    {
+                        &quot;mountPath&quot;: &quot;/var/run/secrets/kubernetes.io/serviceaccount&quot;,
+                        &quot;name&quot;: &quot;kube-api-access-4b4rz&quot;,
+                        &quot;readOnly&quot;: true
+                    }
+                ]
+            }
+        ],
+        &quot;nodeName&quot;: &quot;ocne-w1.lab.test&quot;,
+        &quot;preemptionPolicy&quot;: &quot;PreemptLowerPriority&quot;,
+        &quot;priority&quot;: 0,
+        &quot;restartPolicy&quot;: &quot;Always&quot;,
+        &quot;schedulerName&quot;: &quot;default-scheduler&quot;,
+        &quot;securityContext&quot;: {
+            &quot;sysctls&quot;: [
+                {
+                    &quot;name&quot;: &quot;kernel.shmall&quot;,
+                    &quot;value&quot;: &quot;2097152&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmax&quot;,
+                    &quot;value&quot;: &quot;8589934592&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.shmmni&quot;,
+                    &quot;value&quot;: &quot;4096&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;kernel.sem&quot;,
+                    &quot;value&quot;: &quot;250 32000 100 128&quot;
+                },
+                {
+                    &quot;name&quot;: &quot;net.ipv4.conf.all.rp_filter&quot;,
+                    &quot;value&quot;: &quot;2&quot;
+                }
+            ]
+        },
+        &quot;serviceAccount&quot;: &quot;default&quot;,
+        &quot;serviceAccountName&quot;: &quot;default&quot;,
+        &quot;subdomain&quot;: &quot;racnode&quot;,
+        &quot;terminationGracePeriodSeconds&quot;: 30,
+        &quot;tolerations&quot;: [
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/not-ready&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            },
+            {
+                &quot;effect&quot;: &quot;NoExecute&quot;,
+                &quot;key&quot;: &quot;node.kubernetes.io/unreachable&quot;,
+                &quot;operator&quot;: &quot;Exists&quot;,
+                &quot;tolerationSeconds&quot;: 300
+            }
+        ],
+        &quot;volumes&quot;: [
+            {
+                &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-ssh-key&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {
+                    &quot;medium&quot;: &quot;Memory&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+                &quot;secret&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;secretName&quot;: &quot;rac-db-password&quot;
+                }
+            },
+            {
+                &quot;configMap&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;name&quot;: &quot;racnode1rac19c-cmap&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/rac/cluster01/racnode1&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+            },
+            {
+                &quot;hostPath&quot;: {
+                    &quot;path&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+                    &quot;type&quot;: &quot;&quot;
+                },
+                &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+                }
+            },
+            {
+                &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;,
+                &quot;persistentVolumeClaim&quot;: {
+                    &quot;claimName&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+                }
+            },
+            {
+                &quot;emptyDir&quot;: {},
+                &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+            },
+            {
+                &quot;name&quot;: &quot;kube-api-access-4b4rz&quot;,
+                &quot;projected&quot;: {
+                    &quot;defaultMode&quot;: 420,
+                    &quot;sources&quot;: [
+                        {
+                            &quot;serviceAccountToken&quot;: {
+                                &quot;expirationSeconds&quot;: 3607,
+                                &quot;path&quot;: &quot;token&quot;
+                            }
+                        },
+                        {
+                            &quot;configMap&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;key&quot;: &quot;ca.crt&quot;,
+                                        &quot;path&quot;: &quot;ca.crt&quot;
+                                    }
+                                ],
+                                &quot;name&quot;: &quot;kube-root-ca.crt&quot;
+                            }
+                        },
+                        {
+                            &quot;downwardAPI&quot;: {
+                                &quot;items&quot;: [
+                                    {
+                                        &quot;fieldRef&quot;: {
+                                            &quot;apiVersion&quot;: &quot;v1&quot;,
+                                            &quot;fieldPath&quot;: &quot;metadata.namespace&quot;
+                                        },
+                                        &quot;path&quot;: &quot;namespace&quot;
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    &quot;status&quot;: {
+        &quot;conditions&quot;: [
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T23:59:02Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodReadyToStartContainers&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T23:59:02Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Initialized&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-12T00:02:05Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;Ready&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-12T00:02:05Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;ContainersReady&quot;
+            },
+            {
+                &quot;lastProbeTime&quot;: null,
+                &quot;lastTransitionTime&quot;: &quot;2026-10-11T23:59:00Z&quot;,
+                &quot;status&quot;: &quot;True&quot;,
+                &quot;type&quot;: &quot;PodScheduled&quot;
+            }
+        ],
+        &quot;containerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://355c59bdbd922e68562df052c5996dc12820a9e8fa41a47e98b3ac484079e3d5&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode1-0&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: true,
+                &quot;state&quot;: {
+                    &quot;running&quot;: {
+                        &quot;startedAt&quot;: &quot;2026-10-11T23:59:02Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;hostIP&quot;: &quot;192.168.77.12&quot;,
+        &quot;hostIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;192.168.77.12&quot;
+            }
+        ],
+        &quot;initContainerStatuses&quot;: [
+            {
+                &quot;containerID&quot;: &quot;cri-o://5b643314fd15f553b79acbac0b3b8bc7e1a0a0cdc03b5dd4af5d7545d25a17ba&quot;,
+                &quot;image&quot;: &quot;docker.io/roopla/oracle-rac:19.3.0-slim&quot;,
+                &quot;imageID&quot;: &quot;d3f449132a8807319fde044350ef03c0602491fd3cbce1f738146164e6b9aa52&quot;,
+                &quot;lastState&quot;: {},
+                &quot;name&quot;: &quot;racnode1-init1&quot;,
+                &quot;ready&quot;: true,
+                &quot;restartCount&quot;: 0,
+                &quot;started&quot;: false,
+                &quot;state&quot;: {
+                    &quot;terminated&quot;: {
+                        &quot;containerID&quot;: &quot;cri-o://5b643314fd15f553b79acbac0b3b8bc7e1a0a0cdc03b5dd4af5d7545d25a17ba&quot;,
+                        &quot;exitCode&quot;: 0,
+                        &quot;finishedAt&quot;: &quot;2026-10-11T23:59:01Z&quot;,
+                        &quot;reason&quot;: &quot;Completed&quot;,
+                        &quot;startedAt&quot;: &quot;2026-10-11T23:59:01Z&quot;
+                    }
+                }
+            }
+        ],
+        &quot;phase&quot;: &quot;Running&quot;,
+        &quot;podIP&quot;: &quot;10.244.1.11&quot;,
+        &quot;podIPs&quot;: [
+            {
+                &quot;ip&quot;: &quot;10.244.1.11&quot;
+            }
+        ],
+        &quot;qosClass&quot;: &quot;Burstable&quot;,
+        &quot;startTime&quot;: &quot;2026-10-11T23:59:00Z&quot;
+    }
+}
+Exit code: 0
+SCENARIO S07: PASS; new UID=590e8b8f-3a93-43d1-a8ea-3549e6b83201
+Node1 replacement completed; assess alongside the assisted node2 recovery transcript.
+</code></pre>
+
+
+</details>
+
+<h2 id="exact-startup-error-contexts-captured-next-morning">Exact startup error contexts, captured next morning</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Capture-RAC-Restart-Incident-20261012-074614.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">=== Restart incident: racnode1-0 ===
+Selected restart contexts; original line numbers retained
+3333:
+3334: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   executeprocess   :Received Command : su - grid -c &quot;/u01/app/19c/grid/bin/oraversion -majorVersion&quot;
+3335: 10/11/2026 11:59:18 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : 19
+3336:
+3337: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   restoregifiles   :restore_gi_files invoked (Oracle major version: 19)
+3338: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   restoregifiles   :Found /etc/oracle backup at /u01/app/grid/.etcoraclebackup, restoring
+3339: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   executeprocess   :Received Command : cp -rp /u01/app/grid/.etcoraclebackup/oracle /etc/
+3340: 10/11/2026 11:59:18 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : no Output
+3341: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   restoregifiles   :CRS_GPC not set: updating OS files using rootcrs.sh
+3342: 10/11/2026 11:59:18 PM     INFO:   oracommon   -   executeprocess   :Received Command : /u01/app/19c/grid/crs/install/rootcrs.sh -updateosfiles
+3343: 10/11/2026 11:59:37 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : Using configuration parameter file: /u01/app/19c/grid/crs/install/crsconfig_params
+3344: The log of current session can be found at:
+3345:   /u01/app/grid/crsdata/racnode1-0/crsconfig/crsupdate_osfiles_racnode1-0_2026-10-11_11-59-19PM.log
+3346: Redirecting to /bin/systemctl restart rsyslog.service
+3347: 2026/10/11 23:59:20 CLSRSC-330: Adding Clusterware entries to file 'oracle-ohasd.service'
+3348:
+3349: 10/11/2026 11:59:37 PM     INFO:   oracommon   -   restoregifiles   :Starting Oracle Clusterware (CRS)
+3350: 10/11/2026 11:59:37 PM     INFO:   oracommon   -   executeprocess   :Received Command : /u01/app/19c/grid/bin/crsctl start crs
+3351: 10/11/2026 11:59:42 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : CRS-4123: Oracle High Availability Services has been started.
+3352:
+3353: 10/11/2026 11:59:42 PM     INFO:   oracommon   -   restoregifiles   :GI restore completed and Oracle stack started successfully
+3354: 10/11/2026 11:59:42 PM     INFO:   oracommon   -   executeprocess   :Received Command : su - grid  -c &quot;sudo /u01/app/oraInventory/orainstRoot.sh&quot;
+3355: 10/11/2026 11:59:42 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : Changing permissions of /u01/app/oraInventory.
+3356: Adding read,write permissions for group.
+3357: Removing read,write,execute permissions for world.
+3358:
+3359: Changing groupname of /u01/app/oraInventory to oinstall.
+3360: The execution of the script is complete.
+3361:
+3362: 10/11/2026 11:59:42 PM     INFO:   oracommon   -   executeprocess   :Received Command : /u01/app/19c/grid/bin/crsctl start crs
+3363: 10/11/2026 11:59:42 PM  WARNING:   oracommon   -     checkoserr     :OS command returned code : 1, returned error : no returned error and returned output : CRS-4640: Oracle High Availability Services is already active
+3364: CRS-4000: Command Start failed, or completed with errors.
+3365:
+3366: 10/11/2026 11:59:42 PM  WARNING:   oracommon   -     checkoserr     :OS command  failed. Flag is set to ignore this error!
+3367: 10/11/2026 11:59:42 PM     INFO:  orasetupenv  -     setbanner      :
+3368:           =====================================
+3369:           Grid is not installed on this machine
+3370:           =====================================
+3371:
+3372: 10/11/2026 11:59:42 PM     INFO:  orasetupenv  -finalizeorasetupenv :Total time for orasetupenv setup() = [ 39.453 ] seconds
+3373: 10/11/2026 11:59:42 PM     INFO:   oracommon   -     checkfile      :Inside check_file()
+3374: 10/11/2026 11:59:42 PM     INFO:   oracommon   - processclustervars :Inside process_cluster_vars()
+3375: 10/11/2026 11:59:42 PM     INFO:   oracommon   - processclustervars :Cluster Node Desc: pubhost:racnode1-0,viphost:racnode1-0-vip
+3592: 10/11/2026 11:59:55 PM     INFO:   oracommon   -    setpassword     :&lt;redacted&gt; set to HIDDEN_STRING generated using encrypted password file
+3593: 10/11/2026 11:59:55 PM     INFO:   oracommon   -   executeprocess   :Received Command : su - grid -c &quot;export CV_ASSUME_DISTID=OL8; /u01/app/19c/grid/gridSetup.sh -waitforcompletion  -noCopy  -silent  -responseFile /tmp/grid.rsp oracle.install.crs.config.netmaskList=eth0:255.255.0.0,ens1:255.255.255.0,ens2:255.255.255.0 oracle.install.asm.SYSASMPassword=&lt;redacted&gt; oracle.install.asm.monitorPassword=&lt;redacted&gt;    &quot;
+3594: 10/11/2026 11:59:58 PM  WARNING:   oracommon   -     checkoserr     :OS command returned code : 254, returned error : no returned error and returned output : Launching Oracle Grid Infrastructure Setup Wizard...
+3595:
+3596: [FATAL] [INS-40401] Oracle Grid Infrastructure is already configured on the system.
+3597:    CAUSE: Only one instance of Oracle Grid Infrastructure software can be configured on a system.
+3598:    ACTION: One of the following actions may be considered.
+3599:
+3600: 1. Choose Upgrade option to upgrade Oracle Grid Infrastructure.
+3601:
+3602:  2. It is possible that previous configuration of Oracle Grid Infrastructure was not cleaned properly. Refer to documentation on how to deinstall the product. After performing the deinstall, Oracle Grid Infarstructure can be installed and configured.
+3603:
+3604: 10/11/2026 11:59:58 PM  WARNING:   oracommon   -     checkoserr     :OS command  failed. Flag is set to ignore this error!
+3605: 10/11/2026 11:59:58 PM    ERROR:   oragiprov   -validateinstallmarkers:Grid software install failed. Exiting...
+3606: 10/11/2026 11:59:58 PM     INFO:   oracommon   -     checkfile      :Inside check_file()
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+
+exit code 0
+=== Restart incident: racnode2-0 ===
+Selected restart contexts; original line numbers retained
+3309:
+3310: 10/11/2026 11:51:04 PM     INFO:   oracommon   -   executeprocess   :Received Command : su - grid -c &quot;/u01/app/19c/grid/bin/oraversion -majorVersion&quot;
+3311: 10/11/2026 11:51:04 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : 19
+3312:
+3313: 10/11/2026 11:51:04 PM     INFO:   oracommon   -   restoregifiles   :restore_gi_files invoked (Oracle major version: 19)
+3314: 10/11/2026 11:51:04 PM     INFO:   oracommon   -   restoregifiles   :Found /etc/oracle backup at /u01/app/grid/.etcoraclebackup, restoring
+3315: 10/11/2026 11:51:04 PM     INFO:   oracommon   -   executeprocess   :Received Command : cp -rp /u01/app/grid/.etcoraclebackup/oracle /etc/
+3316: 10/11/2026 11:51:04 PM  WARNING:   oracommon   -     checkoserr     :OS command returned code : 1, returned error : cp: cannot access '/u01/app/grid/.etcoraclebackup/oracle': Permission denied
+3317:  and returned output : no retruned output
+3318: 10/11/2026 11:51:04 PM  WARNING:   oracommon   -     checkoserr     :OS command  failed. Flag is set to ignore this error!
+3319: 10/11/2026 11:51:04 PM    ERROR:   oracommon   -   restoregifiles   :Failed to restore /etc/oracle from backup
+3320: 10/11/2026 11:51:04 PM     INFO:  orasetupenv  -     setbanner      :
+3321:           =====================================
+3322:           Grid is not installed on this machine
+3323:           =====================================
+3324:
+3325: 10/11/2026 11:51:04 PM     INFO:  orasetupenv  -finalizeorasetupenv :Total time for orasetupenv setup() = [ 66.811 ] seconds
+3326: 10/11/2026 11:51:04 PM     INFO:   oracommon   -     checkfile      :Inside check_file()
+3327: 10/11/2026 11:51:04 PM     INFO:  orasetupenv  -waitfororasetupenvcompletion:Not INSTALL_NODE (racnode2-0), skipping wait_for_orasetupenv_completion
+3328: 10/11/2026 11:51:04 PM     INFO:   oracommon   -   executeprocess   :Received Command : su - grid -c &quot;/u01/app/19c/grid/bin/oraversion -majorVersion&quot;
+3329: 10/11/2026 11:51:04 PM     INFO:   oracommon   -     checkoserr     :OS command returned code : 0 and returned output : 19
+3330:
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+
+exit code 0
+</code></pre>
+
+
+</details>
+
+<h2 id="final-crs-asm-patch-sql-and-memory-acceptance">Final CRS ASM patch SQL and memory acceptance</h2>
+<p>Evidence: <code>logs/ssh-ocne-cp-Verify-RAC-Database-20261011-200344.txt</code>.</p>
+<details>
+<summary>Complete command output</summary>
+
+
+<pre><code class="language-text">RacDatabase AVAILABLE
+pod/racnode1-0 condition met
+pod/racnode2-0 condition met
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+racnode1-0  1
+racnode2-0  2
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    102392    89608                0           89608              0             Y  DATA/
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39503034;ACFS RELEASE UPDATE 19.32.0.0.0 (39503034)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39107855;TOMCAT RELEASE UPDATE 19.0.0.0.0 (39107855)
+39107825;DBWLM RELEASE UPDATE 19.0.0.0.0 (39107825)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+NAME      OPEN_MODE        DATABASE_ROLE
+--------- -------------------- ----------------
+RACCDB    READ WRITE           PRIMARY
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 PDB$SEED                                                             READ ONLY
+     1 LABPDB                                                               READ WRITE
+     2 PDB$SEED                                                             READ ONLY
+     2 LABPDB                                                               READ WRITE
+
+
+   INST_ID NAME
+---------- --------------------------------------------------------------------------------
+VALUE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     1 cluster_database
+TRUE
+
+     2 cluster_database
+TRUE
+
+     1 pga_aggregate_target
+2147483648
+
+     2 pga_aggregate_target
+2147483648
+
+     1 sga_target
+3221225472
+
+     2 sga_target
+3221225472
+
+     1 use_large_pages
+FALSE
+
+     2 use_large_pages
+FALSE
+
+
+8 rows selected.
+
+
+    CON_ID   PATCH_ID ACTION          STATUS            DESCRIPTION
+---------- ---------- --------------- ------------------------- ----------------------------------------------------------------------------------------------------
+     1   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     1   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+     3   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     3   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+
+
+no rows selected
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+CRS-4638: Oracle High Availability Services is online
+CRS-4537: Cluster Ready Services is online
+CRS-4529: Cluster Synchronization Services is online
+CRS-4533: Event Manager is online
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+racnode1-0  1
+racnode2-0  2
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+State    Type    Rebal  Sector  Logical_Sector  Block       AU  Total_MB  Free_MB  Req_mir_free_MB  Usable_file_MB  Offline_disks  Voting_files  Name
+MOUNTED  EXTERN  N         512             512   4096  4194304    102392    89608                0           89608              0             Y  DATA/
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39503034;ACFS RELEASE UPDATE 19.32.0.0.0 (39503034)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39107855;TOMCAT RELEASE UPDATE 19.0.0.0.0 (39107855)
+39107825;DBWLM RELEASE UPDATE 19.0.0.0.0 (39107825)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+39526364;OCW RELEASE UPDATE 19.32.0.0.0 (39526364)
+39472050;Database Release Update : 19.32.0.0.260721 (39472050)
+39222882;OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+
+OPatch succeeded.
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+
+   INST_ID INSTANCE_NAME    STATUS   DATABASE_STATUS
+---------- ---------------- ------------ -----------------
+     1 RACCDB1      OPEN     ACTIVE
+     2 RACCDB2      OPEN     ACTIVE
+
+
+NAME      OPEN_MODE        DATABASE_ROLE
+--------- -------------------- ----------------
+RACCDB    READ WRITE           PRIMARY
+
+
+   INST_ID NAME                                                                 OPEN_MODE
+---------- -------------------------------------------------------------------------------------------------------------------------------- ----------
+     1 PDB$SEED                                                             READ ONLY
+     1 LABPDB                                                               READ WRITE
+     2 PDB$SEED                                                             READ ONLY
+     2 LABPDB                                                               READ WRITE
+
+
+   INST_ID NAME
+---------- --------------------------------------------------------------------------------
+VALUE
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+     1 cluster_database
+TRUE
+
+     2 cluster_database
+TRUE
+
+     1 pga_aggregate_target
+2147483648
+
+     2 pga_aggregate_target
+2147483648
+
+     1 sga_target
+3221225472
+
+     2 sga_target
+3221225472
+
+     1 use_large_pages
+FALSE
+
+     2 use_large_pages
+FALSE
+
+
+8 rows selected.
+
+
+    CON_ID   PATCH_ID ACTION          STATUS            DESCRIPTION
+---------- ---------- --------------- ------------------------- ----------------------------------------------------------------------------------------------------
+     1   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     1   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+     3   39222882 APPLY       SUCCESS           OJVM RELEASE UPDATE: 19.32.0.0.260721 (39222882)
+     3   39472050 APPLY       SUCCESS           Database Release Update : 19.32.0.0.260721 (39472050)
+
+
+no rows selected
+
+
+PL/SQL procedure successfully completed.
+
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+--------------------------------------------------------------------------------
+Name           Target  State        Server                   State details
+--------------------------------------------------------------------------------
+Local Resources
+--------------------------------------------------------------------------------
+ora.DBLSNR.lsnr
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.LISTENER.lsnr
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.chad
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.net1.network
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+ora.ons
+               ONLINE  ONLINE       racnode1-0               STABLE
+               ONLINE  ONLINE       racnode2-0               STABLE
+--------------------------------------------------------------------------------
+Cluster Resources
+--------------------------------------------------------------------------------
+ora.ASMNET1LSNR_ASM.lsnr(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.ASMNET2LSNR_ASM.lsnr(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.DATA.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.LISTENER_SCAN1.lsnr
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.LISTENER_SCAN2.lsnr
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+ora.asm(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               Started,STABLE
+      2        ONLINE  ONLINE       racnode2-0               Started,STABLE
+ora.asmnet1.asmnetwork(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.asmnet2.asmnetwork(ora.asmgroup)
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.cvu
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+ora.raccdb.db
+      1        ONLINE  ONLINE       racnode1-0               Open,HOME=/u01/app/o
+                                                             racle/product/19c/db
+                                                             home_1,STABLE
+      2        ONLINE  ONLINE       racnode2-0               Open,HOME=/u01/app/o
+                                                             racle/product/19c/db
+                                                             home_1,STABLE
+ora.raccdb.labpdb_app.svc
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+      2        ONLINE  ONLINE       racnode2-0               STABLE
+ora.racnode1-0.vip
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.racnode2-0.vip
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+ora.scan1.vip
+      1        ONLINE  ONLINE       racnode1-0               STABLE
+ora.scan2.vip
+      1        ONLINE  ONLINE       racnode2-0               STABLE
+--------------------------------------------------------------------------------
+Instance RACCDB1 is running on node racnode1-0 with online services labpdb_app. Instance status: Open.
+Instance RACCDB2 is running on node racnode2-0 with online services labpdb_app. Instance status: Open.
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Service labpdb_app is running on instance(s) RACCDB1,RACCDB2
+</code></pre>
+
+
+</details>
+
+<h2 id="interpretation-of-node1-result">Interpretation of node1 result</h2>
+<p>Node1 used its prepared, relabeled backup to restore GI automatically. Its startup code then issued <code>crsctl start crs</code> a second time. CRS-4640/CRS-4000 (already active) was misclassified as GI not installed, and a redundant installer attempt failed safely with INS-40401. Existing GI/ASM/database continued online; no deinstall/reinstallation was performed to clear this error. SQL and network acceptance passed at00:02 UTC12October (20:02 EDT11October). This is database recovery with a remaining image startup defect, not a clean startup-script success. Correct the duplicate-start handling in a future image build and retest independently before claiming unattended recovery for both nodes.</p>
+<p>The captured root cause for node2 was the copied old MCS label, not absence of a restore function: the image attempted the copy and got Permission denied. Worker-side restorecon plus the explicit assisted recovery succeeded. A repeat node2 replacement after relabel was not injected.</p>
+<p>Output presentation: tabs are expanded and trailing padding is removed; raw local logs remain unchanged.</p>
+</main></body></html>

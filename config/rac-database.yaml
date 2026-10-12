@@ -1,4 +1,5 @@
-# USER-APPLIED ONLY. This file has not been applied to the cluster.
+# Fresh rebuild manifest. Existing rac19c has an immutable legacy service field.
+# For in-place reconciliation use rac-database-live.yaml; see docs/RAC-DEPLOYMENT.md.
 # Verified OL9 slim image and user-provided 19.32 gold ZIPs are staged on both workers.
 # No RU, OPatch, or one-off patch application is configured during provisioning.
 apiVersion: database.oracle.com/v4
@@ -44,29 +45,34 @@ spec:
   scanSvcName: racnode-scan
   scanSvcTargetPort: 31521
   serviceDetails:
-    name: labpdb
+    name: labpdb_app
+    pdb: LABPDB
+    preferred:
+      - RACCDB1
+      - RACCDB2
   envVars:
+    # Image 19.3.0-slim reads ORACLE_PDB_NAME; operator emits ORACLE_PDB.
+    - name: ORACLE_PDB_NAME
+      value: LABPDB
     - name: LOG_DIR
       value: /tmp/orod
     - name: TOTAL_MEMORY
-      value: '19456'
-  # Per pod: 16 GiB ordinary memory + 3 GiB HugePages, 4 of 6 worker CPUs.
+      value: '16384'
+  # Per pod: 16 GiB ordinary memory; HugePages disabled by user request, 4 of 6 worker CPUs.
   # This is a constrained lab profile, not validated RAC workload capacity.
   resources:
     requests:
       cpu: '4'
       memory: 16Gi
-      hugepages-2Mi: 3Gi
     limits:
       cpu: '4'
       memory: 16Gi
-      hugepages-2Mi: 3Gi
   securityContext:
     sysctls:
       - name: kernel.shmall
-        value: '786432'
+        value: '2097152'
       - name: kernel.shmmax
-        value: '3221225472'
+        value: '8589934592'
       - name: kernel.shmmni
         value: '4096'
       - name: kernel.sem

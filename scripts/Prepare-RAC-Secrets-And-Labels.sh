@@ -16,7 +16,7 @@ python3 - "$secret_dir/db-password.txt" <<'PY'
 import secrets,string,sys
 alphabet=string.ascii_letters+string.digits
 with open(sys.argv[1],'x') as target:
- target.write('Rac_' + ''.join(secrets.choice(alphabet) for _ in range(28)))
+ target.write('Rac_9' + ''.join(secrets.choice(alphabet) for _ in range(19)))
 PY
 openssl genrsa -out "$secret_dir/key.pem" 3072 2>/dev/null
 openssl rsa -in "$secret_dir/key.pem" -out "$secret_dir/key.pub" -pubout 2>/dev/null

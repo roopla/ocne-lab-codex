@@ -1,0 +1,1297 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>1. Set up the OCNE 1.9 lab</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: 41984305f0d249d656ad19376dc3cda90ffee5d21b713d4150a9a9d87c2dde9f; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="MANUAL-01-OCNE.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="1-set-up-the-ocne-19-lab">1. Set up the OCNE 1.9 lab</h1>
+<p><a href="OCNE-RAC-END-TO-END-MANUAL.html">Manual start</a> | Next: <a href="MANUAL-02-DATABASE-OPERATOR.html">2. Database Operator</a></p>
+<h2 id="1a-prerequisites-for-setting-up-the-ocne-lab">1a. Prerequisites for setting up the OCNE lab</h2>
+<h3 id="1a1-prepare-tools-capacity-and-an-inventory">1a.1 Prepare tools, capacity and an inventory</h3>
+<p>Install VirtualBox, Windows OpenSSH client, Git (including Git Bash), and Python 3 for local documentation/media checks. Have console administrator access to the golden VM and permission to create lab resources. Do not download an ISO for this cloning path. Existing source software must satisfy Oracle's <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/hosts.html">OCNE host requirements</a>.</p>
+<p>Use an empty project checkout for a separate build. On this completed lab, inventory only; existing resources are not a reason to delete/recreate them. Windows PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+$VBox = Join-Path $env:ProgramFiles 'Oracle\VirtualBox\VBoxManage.exe'
+Get-Command git,ssh,scp,python
+&amp; $VBox --version
+Get-CimInstance Win32_OperatingSystem | Select-Object Caption,TotalVisibleMemorySize,FreePhysicalMemory
+Get-CimInstance Win32_Processor | Select-Object Name,NumberOfLogicalProcessors
+Get-Volume | Select-Object DriveLetter,FileSystem,Size,SizeRemaining
+Get-NetRoute -AddressFamily IPv4 | Select-Object DestinationPrefix,NextHop,InterfaceAlias
+&amp; $VBox list vms
+&amp; $VBox list runningvms
+&amp; $VBox list natnetworks
+&amp; $VBox list intnets
+&amp; $VBox list hdds
+Get-Content .\config\lab.psd1
+</code></pre>
+<p>Inspect and parse the supplied Windows scripts before running them:</p>
+<pre><code class="language-powershell">Get-ChildItem .\scripts\*.ps1 | ForEach-Object {
+    $tokens=$null; $errors=$null
+    [System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors) | Out-Null
+    if ($errors.Count) { throw ($errors | Out-String) }
+}
+.\scripts\00-Inspect-Host.ps1
+</code></pre>
+<p>Equivalent host inventory in <strong>Windows Git Bash</strong>, not inside a guest:</p>
+<pre><code class="language-bash">cd /d/OCNE19-Lab
+VBOX='/c/Program Files/Oracle/VirtualBox/VBoxManage.exe'
+&quot;$VBOX&quot; --version
+&quot;$VBOX&quot; list vms
+&quot;$VBOX&quot; list runningvms
+&quot;$VBOX&quot; list natnetworks
+&quot;$VBOX&quot; list hdds
+df -h /d
+</code></pre>
+<p>Record these values before changing anything:</p>
+<table>
+<thead>
+<tr>
+<th>Value to confirm</th>
+<th>This lab's example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Project root / source VM</td>
+<td>D:\OCNE19-Lab / ol9-golden</td>
+</tr>
+<tr>
+<td>Golden VM UUID, boot UUID, snapshot parents</td>
+<td>Obtain from showvminfo/showmediuminfo; never substitute a disk by size alone</td>
+</tr>
+<tr>
+<td>NAT network / gateway</td>
+<td>ocne19-net / 192.168.77.0/24 / 192.168.77.1</td>
+</tr>
+<tr>
+<td>Reachable DNS resolver</td>
+<td>Site-specific; the source used 192.168.137.1, which must not be assumed elsewhere</td>
+</tr>
+<tr>
+<td>Operator / control plane / workers</td>
+<td>ocne-op .10, ocne-cp .11, ocne-w1 .12, ocne-w2 .13</td>
+</tr>
+<tr>
+<td>FQDN suffix / admin UID:GID</td>
+<td>lab.test / labadmin 1001:1001 after collision checks</td>
+</tr>
+<tr>
+<td>RAM / vCPU</td>
+<td>4/2, 8/4, 22/6, 22/6</td>
+</tr>
+<tr>
+<td>Loopback SSH ports</td>
+<td>2220, 2221, 2222, 2223</td>
+</tr>
+<tr>
+<td>Golden disk layout / root filesystem</td>
+<td>Observed source: 40 GiB, plain partition 2, XFS; inspect yours</td>
+</tr>
+<tr>
+<td>Scratch/ASM private NIC slots</td>
+<td>Later stage used SATA3/4/5 and NIC2/3; confirm free slots</td>
+</tr>
+</tbody>
+</table>
+<p>VM RAM totals 56 GiB; the recorded Windows host has 61.66 GiB visible RAM. Allow host overhead and actual free RAM. The final build has <strong>1056 GiB virtual disk capacity</strong>: four 100 GiB OS disks, two 100 GiB container disks, 100 GiB NFS, two 128 GiB scratch disks and two shared 50 GiB disks counted once. The 100 GiB shared capacity is fixed allocation; other VDI files grow. Allow additional physical space for ZIPs, images, logs, backups and the preserved source. Do not equate virtual capacity with current disk consumption.</p>
+<p>Check Windows sleep before long installs:</p>
+<pre><code class="language-powershell">powercfg /query SCHEME_CURRENT SUB_SLEEP STANDBYIDLE
+# Record the original AC setting first. For this lab session on AC:
+powercfg /change standby-timeout-ac 0
+</code></pre>
+<p>Modern Standby previously paused guests and caused time jumps/stalls. This setting does not prevent explicit sleep/hibernate. Restore your original AC timeout only after an orderly lab shutdown; this host's original value was 60 minutes.</p>
+<p><strong>Gate:</strong> non-overlapping subnets, enough storage/RAM, working tools, identified source and administrator login. Stop if any required input is unknown.</p>
+<h2 id="2-oracle-source-map">2. Oracle source map</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Source</th>
+<th>Exact part used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>C1</td>
+<td><a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/vboxmanage.html">VirtualBox VBoxManage reference</a></td>
+<td>clonevm: mode, basefolder, register, Link and Keep options; modifyvm; showvminfo; storagectl; storageattach; createmedium</td>
+</tr>
+<tr>
+<td>C2</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/kvm-user/kvm-CloningVirtualMachines.html">Oracle Linux 9: Clone Existing KVM Instance</a></td>
+<td>Prepare KVM for Cloning: Manually — network identity, SSH host keys, other unique identifiers, hostname; these are guest preparation principles, not instructions to install KVM</td>
+</tr>
+<tr>
+<td>C3</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/network/network-CreateKeyfileConnectionProfile-nmcli.html">OL9: Creating a keyfile Connection Profile Using nmcli</a></td>
+<td>Device inspection, connection creation, activation, verification; referenced nmcli(1) manual</td>
+</tr>
+<tr>
+<td>C4</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/hosts.html">OCNE 1.9 Host Requirements</a></td>
+<td>OS Requirements, Table 1-1; role-specific storage/RAM requirements</td>
+</tr>
+<tr>
+<td>C5</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/xfs/xfs-CreatinganXFSFileSystem.html">OL9: Creating and Mounting an XFS File System</a></td>
+<td>Identify the device; mkfs.xfs; mount; xfs_info</td>
+</tr>
+<tr>
+<td>C6</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/fsadmin/fsadmin-AbouttheFileSystemMountTable.html">OL9: Managing the File System Mount Table</a></td>
+<td>UUID-based persistent mounts; /etc/fstab</td>
+</tr>
+<tr>
+<td>C7</td>
+<td>Oracle Linux installed system manuals: machine-id(5), systemd-machine-id-setup(1), ssh-keygen(1), hostnamectl(1), nmcli(1)</td>
+<td>OS command semantics used for unique clone identities; see section 7</td>
+</tr>
+</tbody>
+</table>
+<p>C2 covers KVM, not VirtualBox. Only its Linux guest preparation guidance is applied here; VirtualBox cloning itself uses C1. This distinction is deliberate. The shell guards, host naming, directory paths, script numbering, and resource allocations are this lab's implementation, not verbatim Oracle requirements.</p>
+<h3 id="1a2-inspect-the-golden-vm-and-choose-the-source">1a.2 Inspect the golden VM and choose the source</h3>
+<h3 id="4-inspect-the-golden-vm-before-cloning">4. Inspect the golden VM before cloning</h3>
+<p><strong>Run inside the golden VM, read-only. Sources C2 and C4; inspection commands are local checks.</strong></p>
+<pre><code class="language-bash">cat /etc/oracle-release
+uname -r
+hostnamectl
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
+findmnt -T /var
+findmnt -T /var/lib/containers
+df -hT / /var
+id
+id labadmin
+sudo pvs
+sudo vgs
+sudo lvs
+nmcli device status
+nmcli connection show
+rpm -qa | sort | grep -E '^(olcne|kubelet|kubeadm|cri-o|cloud-init|openssh-server|NetworkManager)'
+sudo ls -ld /etc/kubernetes /var/lib/kubelet /var/lib/etcd /etc/olcne /etc/sysconfig/rhn/systemid 2&gt;/dev/null
+sudo systemctl is-enabled cloud-init.service
+</code></pre>
+<p>Missing <code>labadmin</code>, absent directories, an uninstalled LVM tool, or a missing cloud-init service may produce nonzero results in this inspection block. Read the outputs; absence is different from a command failing unexpectedly.</p>
+<p>Check these conditions before choosing this template:</p>
+<ul>
+<li>Oracle Linux 9 and the selected UEK R7 branch meet C4. A newer kernel is not automatically equivalent to UEK R7.</li>
+<li>It is an OS baseline, without an existing Kubernetes cluster, etcd/kubelet state, deployed OCNE certificates, database/ASM disks, or application-specific registrations needing a separate cleanup procedure. Package presence alone does not prove cluster membership; inspect it.</li>
+<li>You have a working local console login and sudo access. Clones initially have no network connection.</li>
+<li><code>/var</code> has capacity for every target role: Oracle lists 40 GB for control plane and 15 GB for operator/workers. Check actual free space as well as filesystem capacity. A 40 GB virtual disk does not by itself satisfy 40 GB in <code>/var</code>.</li>
+<li>The worker must have a dedicated XFS mount at <code>/var/lib/containers</code>. Section 10 provides a new blank disk if it does not already have one.</li>
+<li>Any cloud-init, ULN registration, configuration-management agent, or first-boot automation has been reviewed. A template that automatically restores its old hostname/network or registration requires preparation before this manual path. This guide does not automatically disable unknown software or unregister a source VM.</li>
+</ul>
+<p>If the OS or /var capacity fails the requirement, resolve the observed mismatch before OCNE installation. For this source, OS/kernel checks passed and storage was enlarged only on independent clones. See section 9.1; do not guess resize commands or modify the golden disk.</p>
+<p>In Windows PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+.\scripts\00-Inspect-Host.ps1
+$VBox = Join-Path $env:ProgramFiles 'Oracle\VirtualBox\VBoxManage.exe'
+&amp; $VBox list vms
+$GoldenVM = Read-Host 'Enter the EXACT golden VM name from the list'
+&amp; $VBox showvminfo $GoldenVM
+&amp; $VBox showvminfo $GoldenVM --machinereadable
+</code></pre>
+<p>The current wrapper expects one boot disk on <strong>SATA port 0/device 0</strong>, an existing adapter 1 and no extra attached media. It accepts an inspected accessible normal snapshot chain for full current-state cloning. Machine/transient host shares remain rejected; the observed global Downloads mapping requires the explicit reviewed exception below. Empty optical drives are allowed. Review other layouts before adapting the script.</p>
+<p>Review the source for encrypted disks, snapshots, extra NICs, shared folders, and external disk dependencies. The script turns off extra adapters on clones and preserves the existing boot firmware/controller. It does not claim to handle every specialized template.</p>
+<p>Once inspection is complete, shut down the golden VM from inside it:</p>
+<pre><code class="language-bash">sudo shutdown -h now
+</code></pre>
+<p>Wait until VirtualBox reports <strong>Powered Off</strong>, not Saved. Keep it powered off during cloning. If an ISO is mounted, detach that optical medium through VirtualBox settings; do not detach the boot disk.</p>
+<h2 id="1b-setting-up-the-ocne-lab">1b. Setting up the OCNE lab</h2>
+<p>Run the following sequence only for a new lab. Sections 5-10 below retain the cloning guide's step numbers so source references remain easy to cross-check. This is the <strong>cloning workflow</strong>: do not run fresh-ISO scripts 02 or 03.</p>
+<h3 id="5-create-or-verify-the-lab-network">5. Create or verify the lab network</h3>
+<p><strong>Run on Windows. Source C1 → natnetwork.</strong></p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+&amp; $VBox list natnetworks
+Get-NetRoute -AddressFamily IPv4 |
+    Select-Object DestinationPrefix, NextHop, InterfaceAlias
+</code></pre>
+<p>Confirm <code>192.168.77.0/24</code> does not overlap your LAN/VPN. If <code>ocne19-net</code> is absent, create it using the supplied script:</p>
+<pre><code class="language-powershell">.\scripts\01-Create-Network.ps1
+</code></pre>
+<p>If it already exists, inspect it instead of recreating it. It must have the documented subnet, DHCP disabled, and loopback SSH forwarding 2220/2221/2222/2223 to .10/.11/.12/.13 port 22. The clone script verifies the network name, not every rule; you must review the actual network output.</p>
+<p>For an existing matching network that is stopped:</p>
+<pre><code class="language-powershell">&amp; $VBox natnetwork start --netname ocne19-net
+</code></pre>
+<h3 id="6-create-the-four-full-clones">6. Create the four full clones</h3>
+<p><strong>Run on Windows. Source C1 → VBoxManage clonevm and modifyvm.</strong></p>
+<p>For the inspected source (ol9-golden), these were the reviewed options. Recheck the snapshot chain and global Downloads share before future use. Do not blindly approve another mapping. Existing destinations cause a stop and must be inspected, not deleted. First perform the script's read-only preflight:</p>
+<pre><code class="language-powershell">.\scripts\06-Clone-Golden-VM.ps1 -GoldenVM $GoldenVM -ReviewedGlobalShare Downloads -BootDiskMB 102400
+</code></pre>
+<p>After reviewing its output and completing section 4:</p>
+<pre><code class="language-powershell">.\scripts\06-Clone-Golden-VM.ps1 -GoldenVM $GoldenVM -ReviewedGlobalShare Downloads -BootDiskMB 102400 -Create
+</code></pre>
+<p>The script uses <code>clonevm --mode machine --register --basefolder</code>, without <code>Link</code>, <code>KeepAllMACs</code>, or <code>KeepHwUUIDs</code>. It clones the current state without copying snapshot history. Each clone has independent virtual disks, new VirtualBox identities, and its assigned RAM/CPU. The new machines remain powered off with adapter 1's cable disconnected and any extra adapters disabled.</p>
+<p>The source VM is not modified by the script. It never deletes an existing destination; if a command fails partway through, inspect the partially created VMs instead of rerunning creation or deleting them.</p>
+<p>Check all four registrations and their MAC/VM identities:</p>
+<pre><code class="language-powershell">&amp; $VBox list vms
+foreach ($Name in @('ocne-op','ocne-cp','ocne-w1','ocne-w2')) {
+    &amp; $VBox showvminfo $Name --machinereadable |
+        Select-String '^(name|UUID|hardwareuuid|memory|cpus|nic1|macaddress1|cableconnected1)='
+}
+</code></pre>
+<p>Expect 4096, 8192, 22528, 22528 MiB. All four MAC addresses and VM UUIDs must differ. Cloning does not change Linux hostnames, static IPs, machine IDs, or SSH host keys; the next sections do that.</p>
+<h3 id="7-prepare-each-clone-while-its-network-is-disconnected">7. Prepare each clone while its network is disconnected</h3>
+<p>The manual sections 7–9 explain one-time preparation. The recorded run used <code>Prepare-Clone-Identity.sh</code> through disconnected consoles and a nonbootable preparation ISO; <strong>do not also perform manual resets after using that helper</strong>. Its UUID/MAC guards are specific to these clones, including observed SMBIOS UUID byte-order representations. See <a href="SCRIPT-REFERENCE.md">Script reference</a>.</p>
+<p>For a separately reviewed manual build, repeat sections 7–9 for <strong>one clone at a time</strong>. Use its VirtualBox console window, not SSH. Check the window title so you do not run these commands on the golden VM.</p>
+<p>On Windows, start the first clone:</p>
+<pre><code class="language-powershell">&amp; $VBox startvm ocne-op --type gui
+</code></pre>
+<p>Log in using the golden VM's existing administrator account and password. Subsequent clones use <code>ocne-cp</code>, <code>ocne-w1</code>, and <code>ocne-w2</code> in the same start command.</p>
+<h4 id="71-select-the-clone-identity">7.1 Select the clone identity</h4>
+<p><strong>Sources C2 → change hostname / remove unique settings; C7 → hostnamectl(1).</strong></p>
+<p>Run this prompt block in the clone console. Enter the name shown in the VM window:</p>
+<pre><code class="language-bash">read -r -p 'This clone name (ocne-op / ocne-cp / ocne-w1 / ocne-w2): ' LAB_NODE
+case &quot;$LAB_NODE&quot; in
+  ocne-op) LAB_IP=192.168.77.10 ;;
+  ocne-cp) LAB_IP=192.168.77.11 ;;
+  ocne-w1) LAB_IP=192.168.77.12 ;;
+  ocne-w2) LAB_IP=192.168.77.13 ;;
+  *) echo 'Invalid clone name. Stop and repeat this block.'; LAB_IP='' ;;
+esac
+if [ -n &quot;$LAB_IP&quot; ]; then
+  sudo hostnamectl set-hostname &quot;$LAB_NODE.lab.test&quot;
+  printf 'Clone %s will use %s\n' &quot;$LAB_NODE&quot; &quot;$LAB_IP&quot;
+fi
+</code></pre>
+<p>Verify the chosen identity before continuing:</p>
+<pre><code class="language-bash">hostnamectl --static
+</code></pre>
+<h4 id="72-replace-copied-host-identities-and-reboot">7.2 Replace copied host identities and reboot</h4>
+<p><strong>Source C2 → manual preparation, SSH key removal and other unique identifiers. Command references: C7, the Oracle Linux <code>machine-id(5)</code> and <code>ssh-keygen(1)</code> manuals.</strong> Machine IDs must be unique. The upstream systemd explanation of the same mechanism is <a href="https://systemd.io/BUILDING_IMAGES/">Building Images Safely → Resources to Reset</a>; this supplements the OS manual, not OCNE installation instructions.</p>
+<p>Record the old ID for comparison. Stop SSH, remove the clone's copied host keys, and reset its machine ID for the next boot. The network cable must still be disconnected.</p>
+<pre><code class="language-bash">sudo bash &lt;&lt;'CLONE_IDENTITIES'
+set -euo pipefail
+case &quot;$(hostname -s)&quot; in
+  ocne-op|ocne-cp|ocne-w1|ocne-w2) ;;
+  *) echo 'Expected a named clone. Stop.'; exit 1 ;;
+esac
+if [ -e /root/ocne-clone-identity-reset ]; then
+  echo 'Identity reset was already requested; verify it instead of repeating.'; exit 1
+fi
+cp /etc/machine-id /root/ocne-template-machine-id
+systemctl stop sshd
+rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+# Empty machine-id is initialized on the next boot. Remove the copied D-Bus fallback too.
+truncate -s 0 /etc/machine-id
+rm -f /var/lib/dbus/machine-id
+ln -s /etc/machine-id /var/lib/dbus/machine-id
+touch /root/ocne-clone-identity-reset
+sync
+systemctl reboot
+CLONE_IDENTITIES
+</code></pre>
+<p>After reboot, log in again through the console. Shell variables from before the reboot are gone; later steps derive the node name again.</p>
+<pre><code class="language-bash">hostnamectl --static
+cat /etc/machine-id
+sudo cat /root/ocne-template-machine-id
+sudo ssh-keygen -A
+sudo systemctl enable --now sshd
+sudo ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+</code></pre>
+<p>The new machine ID must differ from the copied ID. Across the four clones, machine IDs and SSH host-key fingerprints must all differ. <code>ssh-keygen -A</code> generates missing host keys; it does not generate a user login key. In a template with a custom host-key type or a FIPS policy, inspect <code>sshd -T</code> and fingerprint the configured host key instead of assuming Ed25519 exists.</p>
+<p>Do not regenerate host identities again after the machine has been deployed. The old ID recorded in <code>/root</code> is for verification only; never copy SSH private host keys into Git.</p>
+<h3 id="8-configure-the-clones-account-network-and-name-resolution">8. Configure the clone's account, network, and name resolution</h3>
+<h4 id="81-keep-a-consistent-installation-account">8.1 Keep a consistent installation account</h4>
+<p>The main guide uses <code>labadmin</code>. If the golden VM already has it, keep it and confirm sudo works:</p>
+<pre><code class="language-bash">id labadmin
+sudo -v
+</code></pre>
+<p>If it is absent, use the same existing administrator consistently in the OCNE guide, or create <code>labadmin</code> on each clone with Oracle Linux's standard account tools. To retain the supplied guide's account name, inspect existing UIDs/GIDs first with <code>getent passwd 1001</code> and <code>getent group 1001</code> on all clones. This run found 1001 unused and selected it consistently. If either ID is occupied, investigate instead of reusing or renumbering it. For that verified branch:</p>
+<pre><code class="language-bash"># Use 1001 only after confirming both IDs are unused on every clone.
+sudo groupadd -g 1001 labadmin
+sudo useradd -m -u 1001 -g labadmin -G wheel labadmin
+sudo passwd labadmin
+id labadmin
+</code></pre>
+<p>Run the creation commands only when <code>id labadmin</code> showed that the user was absent. Use a password interactively, not in a script or Git file. Confirm <code>labadmin</code> can log in locally and use sudo. Compare its numeric UID and primary GID across all four clones; NFS later relies on matching identities. Do not add blanket passwordless sudo. Reference: the Oracle Linux <code>useradd(8)</code>, <code>passwd(1)</code>, and <code>sudo(8)</code> manuals; the installation account is a local provisioning choice.</p>
+<h4 id="82-configure-a-new-static-network-profile">8.2 Configure a new static network profile</h4>
+<p><strong>Source C3 and its referenced nmcli(1) manual.</strong> Remain in the clone console. First identify the actual Ethernet interface and inherited connection profiles:</p>
+<pre><code class="language-bash">nmcli device status
+nmcli -f NAME,UUID,TYPE,DEVICE connection show
+ip -br link
+</code></pre>
+<p>The interface might be <code>enp0s3</code>, but do not assume it. Because only adapter 1 is enabled, there should be one lab Ethernet device. If it is unmanaged or multiple unexpected interfaces exist, resolve that observed state first.</p>
+<p>For each inherited <strong>Ethernet</strong> profile that could bind to this interface, disable autoconnect by its actual UUID. Repeat only for the relevant copied profiles:</p>
+<pre><code class="language-bash">read -r -p 'Actual inherited Ethernet profile UUID to disable: ' OLD_PROFILE
+sudo nmcli connection modify uuid &quot;$OLD_PROFILE&quot; connection.autoconnect no
+</code></pre>
+<p>This preserves the old profiles for inspection. Create a new profile with the actual device and reachable DNS IPs. All addressing below is the lab's chosen configuration:</p>
+<pre><code class="language-bash">LAB_NODE=$(hostname -s)
+case &quot;$LAB_NODE&quot; in
+  ocne-op) LAB_IP=192.168.77.10 ;;
+  ocne-cp) LAB_IP=192.168.77.11 ;;
+  ocne-w1) LAB_IP=192.168.77.12 ;;
+  ocne-w2) LAB_IP=192.168.77.13 ;;
+  *) LAB_IP='' ;;
+esac
+read -r -p 'Actual Ethernet device name from nmcli: ' LAB_IFACE
+read -r -p 'Reachable DNS server IPs, separated by spaces: ' LAB_DNS
+if [ -z &quot;$LAB_IP&quot; ] || [ -z &quot;$LAB_IFACE&quot; ] || [ -z &quot;$LAB_DNS&quot; ]; then
+  echo 'Missing/invalid input. Stop and repeat this block.'
+else
+  sudo nmcli connection add type ethernet ifname &quot;$LAB_IFACE&quot; \
+    con-name ocne-lab ip4 &quot;$LAB_IP/24&quot; gw4 192.168.77.1
+  sudo nmcli connection modify ocne-lab \
+    ipv4.method manual ipv4.dns &quot;$LAB_DNS&quot; \
+    connection.autoconnect yes connection.autoconnect-priority 100
+fi
+</code></pre>
+<p>Create <code>ocne-lab</code> only once. If it already exists, inspect and modify that profile instead of creating duplicate names. A newly created profile avoids the copied MAC-address binding noted in C2. The recorded run used enp0s3 and reachable LAN DNS server 192.168.137.1. Recheck these observed inputs if host networking changes.</p>
+<h4 id="83-add-lab-hostnames">8.3 Add lab hostnames</h4>
+<p>Back up and edit the hosts file, preserving localhost entries and unrelated valid mappings:</p>
+<pre><code class="language-bash">sudo cp -p /etc/hosts /etc/hosts.before-ocne-clone
+sudo vi /etc/hosts
+</code></pre>
+<p>Remove stale mappings for the golden VM's hostname/IP that would conflict with this clone. Add these four entries once:</p>
+<pre><code class="language-text">192.168.77.10 ocne-op.lab.test ocne-op
+192.168.77.11 ocne-cp.lab.test ocne-cp
+192.168.77.12 ocne-w1.lab.test ocne-w1
+192.168.77.13 ocne-w2.lab.test ocne-w2
+</code></pre>
+<p>These are local hostname-resolution inputs for the OCNE guide. They do not require a new DNS server.</p>
+<h3 id="9-reconnect-only-the-prepared-clone-and-verify-ssh">9. Reconnect only the prepared clone and verify SSH</h3>
+<p>After identity and network preparation, shut down this clone from its console:</p>
+<pre><code class="language-bash">sudo shutdown -h now
+</code></pre>
+<p>Wait for Powered Off. <strong>Run on Windows. Source C1 → modifyvm and startvm.</strong> Persistently reconnect the prepared clone's adapter, then start it. Set <code>$CloneName</code> to the clone you just prepared:</p>
+<pre><code class="language-powershell">$CloneName = Read-Host 'Prepared clone name'
+if ($CloneName -notin @('ocne-op','ocne-cp','ocne-w1','ocne-w2')) {
+    throw 'Unexpected clone name'
+}
+&amp; $VBox modifyvm $CloneName --cableconnected1 on
+&amp; $VBox startvm $CloneName --type gui
+</code></pre>
+<p>Inside that clone's console, activate the new profile immediately:</p>
+<pre><code class="language-bash">sudo nmcli connection up ocne-lab
+ip -br address
+ip route
+getent hosts ocne-op.lab.test ocne-cp.lab.test ocne-w1.lab.test ocne-w2.lab.test
+sudo systemctl status sshd --no-pager
+</code></pre>
+<p>Confirm there is only the intended lab IPv4 on the interface and the default route uses <code>.1</code>. If the old profile activated, bring it down by its UUID and reactivate <code>ocne-lab</code> from the console.</p>
+<p>Check SSH access through the active firewalld zone. <strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/firewall/firewall-ConfiguringfirewalldZones.html">Oracle Linux: Configuring firewalld Zones → Controlling Access to Services</a>. Inspect before changing it:</p>
+<pre><code class="language-bash">sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --get-default-zone
+</code></pre>
+<p>If that zone does not already allow SSH, use the actual lab-interface zone:</p>
+<pre><code class="language-bash">read -r -p 'Actual firewalld zone for the lab interface: ' LAB_ZONE
+sudo firewall-cmd --zone=&quot;$LAB_ZONE&quot; --add-service=ssh
+sudo firewall-cmd --permanent --zone=&quot;$LAB_ZONE&quot; --add-service=ssh
+</code></pre>
+<p>This permits host access; later OCNE firewall rules still come from Part B. Keep SELinux enabled. If the template does not have firewalld or OpenSSH installed, stop and complete the documented host baseline before treating it as ready.</p>
+<p>In Windows, use the matching command:</p>
+<pre><code class="language-powershell">ssh -p 2220 labadmin@127.0.0.1
+# Control plane after preparing it:
+ssh -p 2221 labadmin@127.0.0.1
+# Worker 1 after preparing it:
+ssh -p 2222 labadmin@127.0.0.1
+# Worker 2 after preparing it:
+ssh -p 2223 labadmin@127.0.0.1
+</code></pre>
+<p>At first connection, compare the displayed SSH fingerprint to the one recorded in that VM's console. Do not bypass host-key checking. If a port was used by an older lab, verify the new identity before removing that specific stale known_hosts entry.</p>
+<p>Once all four hosts are prepared, verify reachability from the operator:</p>
+<pre><code class="language-bash">for node in ocne-cp.lab.test ocne-w1.lab.test ocne-w2.lab.test; do
+  ssh &quot;labadmin@$node&quot; 'hostname; cat /etc/machine-id; uname -r'
+done
+</code></pre>
+<p>This initial check can use passwords if permitted by the template's SSH policy. The original guide's B7 configures the operator's user-key SSH access; do not copy the golden VM's private login keys to establish it.</p>
+<h4 id="91-grow-the-clone-root-before-ocne-prerequisites">9.1 Grow the clone root before OCNE prerequisites</h4>
+<p>The recorded clones have 100 GiB VDIs, but initially inherited the source's 40 GiB partition layout. Expanding the VDI alone does not expand /var.</p>
+<p>Inspect each clone using lsblk, findmnt, blkid and the partition table. This run verified plain XFS on partition 2, start sector 2099200, original size 79691776 sectors, inherited root UUID 7ca3aaf4-86fd-4ec7-83f8-1e7e18f27651, and a 107374182400-byte independent parent disk. These are recorded values, not defaults for another source.</p>
+<p>The reviewed <a href="../scripts/Grow-Clone-Root.sh">Grow-Clone-Root.sh</a> checked those values, saved the partition table, ran growpart in dry-run mode, grew partition 2 without changing its start, then ran xfs_growfs on the mounted root. It verified at least 40 GiB available under /var afterward. Final root size was approximately 99 GiB on all four clones. Never shrink, recreate or move the root partition; do not use this helper to repair an unknown layout.</p>
+<p>These are local provisioning steps. Sources: <a href="https://docs.oracle.com/en/database/other-databases/essbase/19.3/essad/resize-block-storage-volumes.html">Oracle's growpart/XFS expansion example</a> (only the Linux expansion operations apply), <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/xfs/xfs-GrowinganXFSFileSystem.html">OL9 Growing an XFS File System</a>, and C1 modifymedium. Verify growth before Part B.</p>
+<h4 id="92-completed-windows-and-guest-ssh-integration">9.2 Completed Windows and guest SSH integration</h4>
+<p>The later user-requested workstation and all-node key access is documented in <a href="SSH-ACCESS.md">SSH access</a>. Windows hosts maps the actual .10–.13 guest addresses; SSH aliases separately select loopback NAT forwards with pinned host keys. Hosts entries alone do not create a route. Every guest keeps its own private key; only public keys were exchanged. Password-required sudo remains.</p>
+<h3 id="10-provide-dedicated-xfs-container-storage-on-each-worker">10. Provide dedicated XFS container storage on each worker</h3>
+<p><strong>Sources C4 → Worker Node Hardware; C5 and C6.</strong> Do this before installing OCNE/CRI-O or pulling container images.</p>
+<p>Inspect each worker:</p>
+<pre><code class="language-bash">findmnt -M /var/lib/containers
+findmnt -T /var/lib/containers
+sudo ls -la /var/lib/containers
+</code></pre>
+<p>If a suitable dedicated XFS filesystem is already mounted there, keep it and skip adding/formatting another disk. <code>findmnt -T</code> showing <code>/</code> or <code>/var</code> alone does not prove a dedicated mount exists.</p>
+<p>In the recorded run, Podman left only empty sigstore/storage/tmp scaffolding. <a href="../scripts/Prepare-Worker-XFS.sh">Prepare-Worker-XFS.sh</a> rejected other content, preserved the directories in /var/lib/containers.before-ocne-xfs and copied metadata onto the new filesystem before relabeling. It selected each disk by its observed VBox serial and required a blank whole 100 GiB device. The inline block below is the alternative strictly-empty-directory branch; do not run both.</p>
+<p>If the path contains existing container data, do not hide it with a mount or delete it. This guide's new disk branch requires an empty/absent target on a clean clone. For each worker that needs a disk, shut it down cleanly:</p>
+<pre><code class="language-bash">sudo shutdown -h now
+</code></pre>
+<p>Run the matching Windows command only after that worker is Powered Off:</p>
+<pre><code class="language-powershell">.\scripts\07-Add-Worker-Container-Disk.ps1 -VMName ocne-w1
+.\scripts\07-Add-Worker-Container-Disk.ps1 -VMName ocne-w2
+</code></pre>
+<p>Each invocation attaches one blank 100 GiB VDI at SATA port 2. Restart each worker through VirtualBox Manager. Reconnect through SSH or its console.</p>
+<p>Inspect disks and explicitly identify the new disk. <strong>Never infer its name from this document; the OS disk may also be 100 GiB.</strong></p>
+<pre><code class="language-bash">lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL,SERIAL
+ls -l /dev/disk/by-id/
+</code></pre>
+<p>Run once on each worker requiring the new mount:</p>
+<pre><code class="language-bash">read -r -p 'Actual NEW blank container disk path: ' CONTAINER_DISK
+sudo bash -s -- &quot;$CONTAINER_DISK&quot; &lt;&lt;'WORKER_XFS'
+set -euo pipefail
+case &quot;$(hostname -s)&quot; in
+  ocne-w1|ocne-w2) ;;
+  *) echo 'This step is for a worker only'; exit 1 ;;
+esac
+disk=$(readlink -f -- &quot;$1&quot;)
+[[ -b &quot;$disk&quot; ]] || { echo 'Not a block device'; exit 1; }
+[[ $(lsblk -dn -o TYPE &quot;$disk&quot;) == disk ]] || { echo 'Not a whole disk'; exit 1; }
+[[ $(blockdev --getsize64 &quot;$disk&quot;) == 107374182400 ]] || { echo 'Expected new 100 GiB disk'; exit 1; }
+[[ $(lsblk -nr -o NAME &quot;$disk&quot; | wc -l) -eq 1 ]] || { echo 'Disk has child devices'; exit 1; }
+[[ -z $(lsblk -nr -o MOUNTPOINTS &quot;$disk&quot; | tr -d '[:space:]') ]] || { echo 'Disk is mounted'; exit 1; }
+signatures=$(wipefs -n --noheadings &quot;$disk&quot;)
+[[ -z &quot;$signatures&quot; ]] || { echo 'Disk has existing signatures'; exit 1; }
+target=/var/lib/containers
+if mountpoint -q &quot;$target&quot; || grep -Eq '^[^#]*[[:space:]]/var/lib/containers[[:space:]]' /etc/fstab; then
+    echo 'Existing container mount/configuration; inspect it'; exit 1
+fi
+if [[ -d &quot;$target&quot; ]] &amp;&amp; [[ -n $(ls -A &quot;$target&quot;) ]]; then
+    echo 'Container directory is not empty; stop'; exit 1
+fi
+mkfs.xfs &quot;$disk&quot;
+uuid=$(blkid -s UUID -o value &quot;$disk&quot;)
+[[ -n &quot;$uuid&quot; ]]
+mkdir -p &quot;$target&quot;
+cp -p /etc/fstab &quot;/etc/fstab.before-container-disk-$(date +%Y%m%d%H%M%S)&quot;
+printf 'UUID=%s %s xfs defaults 0 0\n' &quot;$uuid&quot; &quot;$target&quot; &gt;&gt; /etc/fstab
+systemctl daemon-reload
+mount &quot;$target&quot;
+mountpoint -q &quot;$target&quot;
+restorecon -v &quot;$target&quot;
+xfs_info &quot;$target&quot;
+WORKER_XFS
+</code></pre>
+<p>The device guard and UUID insertion are local wrappers around Oracle's documented format/mount procedure. <code>restorecon</code> applies the installed SELinux policy's default label to the mount root; do not disable SELinux. The <code>restorecon(8)</code> manual documents this command.</p>
+<p>Verify:</p>
+<pre><code class="language-bash">findmnt -M /var/lib/containers
+df -hT /var /var/lib/containers
+</code></pre>
+<p>The container disk belongs to that worker alone. It is not a shared ASM disk and is not the NFS share.</p>
+<h3 id="1b11-root-growth-when-the-inspected-source-needs-it">1b.11 Root growth when the inspected source needs it</h3>
+<p>If the clone's root is XFS on a plain partition at the end of its boot disk, the following manual procedure explains the growth used here. If it is LVM, encrypted, another filesystem, or not the last partition, stop and use the matching storage procedure. This block is <strong>clone only</strong>, after VBox has enlarged its independent VDI to 100 GiB.</p>
+<p>Run as root inside one clone at a time:</p>
+<pre><code class="language-bash">set -euo pipefail
+case $(hostname -s) in ocne-op|ocne-cp|ocne-w1|ocne-w2) ;; *) exit 1;; esac
+rootdev=$(findmnt -nro SOURCE /)
+test &quot;$(findmnt -nro FSTYPE /)&quot; = xfs
+part=${rootdev##*/}
+test -r &quot;/sys/class/block/$part/partition&quot;
+number=$(cat &quot;/sys/class/block/$part/partition&quot;)
+disk=/dev/$(lsblk -dnro PKNAME &quot;$rootdev&quot;)
+lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,SERIAL &quot;$disk&quot;
+parted -s &quot;$disk&quot; unit s print free
+# Inspect the printed map: root must be the final partition followed by free space.
+read -r -p 'Enter the verified clone boot disk serial: ' expected_serial
+test -n &quot;$expected_serial&quot;
+test &quot;$(lsblk -dnro SERIAL &quot;$disk&quot; | xargs)&quot; = &quot;$expected_serial&quot;
+test &quot;$(blockdev --getsize64 &quot;$disk&quot;)&quot; = 107374182400
+before_uuid=$(blkid -s UUID -o value &quot;$rootdev&quot;)
+before_start=$(cat &quot;/sys/class/block/$part/start&quot;)
+dnf install -y cloud-utils-growpart
+backup=&quot;/root/clone-root-$(date -u +%Y%m%dT%H%M%SZ).sfdisk&quot;
+sfdisk --dump &quot;$disk&quot; &gt; &quot;$backup&quot;
+chmod 600 &quot;$backup&quot;
+growpart -N &quot;$disk&quot; &quot;$number&quot;
+# Review the dry run before proceeding to these commands:
+growpart &quot;$disk&quot; &quot;$number&quot;
+udevadm settle
+test &quot;$(cat &quot;/sys/class/block/$part/start&quot;)&quot; = &quot;$before_start&quot;
+test &quot;$(blkid -s UUID -o value &quot;$rootdev&quot;)&quot; = &quot;$before_uuid&quot;
+xfs_growfs -d /
+df -hT / /var
+</code></pre>
+<p>Expected: unchanged start sector and filesystem UUID, expanded XFS, enough /var capacity/free space for the chosen role. If growpart says NOCHANGE, inspect existing geometry rather than rerunning blindly.</p>
+<h3 id="1b12-workstation-and-guest-ssh-without-login-passwords">1b.12 Workstation and guest SSH without login passwords</h3>
+<p>Create one workstation key under ignored private/, then install <strong>only its public key</strong> on all four guests. Passphrase-protected keys can use an SSH agent; an unencrypted lab key needs restrictive Windows ACLs. Verify the guest host fingerprint at its console before accepting the first SSH connection.</p>
+<p>Windows PowerShell, project root:</p>
+<pre><code class="language-powershell">New-Item -ItemType Directory -Force .\private | Out-Null
+ssh-keygen -t ed25519 -f D:\OCNE19-Lab\private\workstation_ed25519 -C ocne-workstation
+$LabPorts = @(2220,2221,2222,2223)
+foreach ($Port in $LabPorts) {
+    Get-Content .\private\workstation_ed25519.pub | ssh -p $Port labadmin@127.0.0.1 'umask 077; mkdir -p ~/.ssh; cat &gt;&gt; ~/.ssh/authorized_keys; chmod 700 ~/.ssh; chmod 600 ~/.ssh/authorized_keys'
+}
+</code></pre>
+<p>For a fresh project, place this pattern in the Windows user's <code>.ssh/config</code>, with one block per guest; preserve unrelated entries. Use absolute key paths, and verify permissions with <code>icacls</code> if OpenSSH reports bad owner/permissions.</p>
+<pre><code class="language-sshconfig">Host ocne-op ocne-op.lab.test
+    HostName 127.0.0.1
+    Port 2220
+    User labadmin
+    IdentityFile D:/OCNE19-Lab/private/workstation_ed25519
+    IdentitiesOnly yes
+Host ocne-cp ocne-cp.lab.test
+    HostName 127.0.0.1
+    Port 2221
+    User labadmin
+    IdentityFile D:/OCNE19-Lab/private/workstation_ed25519
+    IdentitiesOnly yes
+Host ocne-w1 ocne-w1.lab.test
+    HostName 127.0.0.1
+    Port 2222
+    User labadmin
+    IdentityFile D:/OCNE19-Lab/private/workstation_ed25519
+    IdentitiesOnly yes
+Host ocne-w2 ocne-w2.lab.test
+    HostName 127.0.0.1
+    Port 2223
+    User labadmin
+    IdentityFile D:/OCNE19-Lab/private/workstation_ed25519
+    IdentitiesOnly yes
+</code></pre>
+<p>Windows hosts entries should contain the <strong>actual guest IPs</strong>, not 127.0.0.1. From an elevated PowerShell, inspect the existing file, back it up, and edit only conflicting lab entries. The reviewed <code>Update-Windows-Lab-Hosts.ps1</code> automates this project-specific update. Manual edit:</p>
+<pre><code class="language-powershell">$HostsFile = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
+Get-Content $HostsFile
+Copy-Item -LiteralPath $HostsFile -Destination (Join-Path (Get-Location) ('logs\hosts-before-' + (Get-Date -Format yyyyMMddHHmmss) + '.txt'))
+notepad.exe $HostsFile
+</code></pre>
+<p>Add the four mapping lines shown in section 8.3 once. Hosts entries resolve names; VirtualBox NAT still needs the SSH loopback forwards above. Test each alias:</p>
+<pre><code class="language-powershell">foreach ($Node in @('ocne-op','ocne-cp','ocne-w1','ocne-w2')) {
+    ssh -o BatchMode=yes $Node 'hostname -f; id -un'
+    if ($LASTEXITCODE -ne 0) { throw &quot;SSH verification failed: $Node&quot; }
+}
+</code></pre>
+<p>Equivalent public-key installation in Git Bash:</p>
+<pre><code class="language-bash">for port in 2220 2221 2222 2223; do
+  ssh-copy-id -i private/workstation_ed25519.pub -p &quot;$port&quot; labadmin@127.0.0.1
+done
+</code></pre>
+<p>On <strong>each guest as labadmin</strong>, create a unique user key only if absent, install its public key on all four nodes, and verify the mesh. First connections require matching each console fingerprint; ssh-copy-id prompts for the destination account password during this one-time setup.</p>
+<pre><code class="language-bash">test -e ~/.ssh/id_rsa || ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+for node in ocne-op ocne-cp ocne-w1 ocne-w2; do
+  ssh-copy-id -i ~/.ssh/id_rsa.pub &quot;labadmin@$node.lab.test&quot;
+done
+for node in ocne-op ocne-cp ocne-w1 ocne-w2; do
+  ssh -o BatchMode=yes &quot;$node.lab.test&quot; 'hostname -f; id -un' || break
+done
+</code></pre>
+<p>Passwordless SSH does not imply passwordless sudo. Never copy private keys between guests. The certificate-copy privilege issue is addressed before B10 below.</p>
+<h3 id="1b13-install-ocne-through-oracles-full-procedure">1b.13 Install OCNE through Oracle's full procedure</h3>
+<p>The following B/C/D sections are reproduced from the sourced installation guide, <strong>excluding its fresh-ISO Part A</strong>. Keep the section source IDs below; local names are explicit substitutions. Complete each verification before moving on.</p>
+<h2 id="source-map">Source map</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Oracle source</th>
+<th>Sections used</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/hosts.html">Host Requirements</a></td>
+<td>Role hardware requirements; OS Requirements</td>
+</tr>
+<tr>
+<td>S2</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">Prerequisites</a></td>
+<td>OL9 repositories; time; swap; agent access; non-HA firewall; OL9 nftables; bridge networking; SSH</td>
+</tr>
+<tr>
+<td>S3</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">Installing Oracle Cloud Native Environment</a></td>
+<td>Operator/agent packages; certificates; starting services</td>
+</tr>
+<tr>
+<td>S4</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/env-create.html">Creating an Environment</a></td>
+<td>Creating an Environment using Certificates</td>
+</tr>
+<tr>
+<td>S5</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/deploy-kube-intro.html">Creating a Kubernetes Cluster</a></td>
+<td>Single control plane; validate; install; report</td>
+</tr>
+<tr>
+<td>S6</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/kubectl-intro.html">Setting up kubectl</a></td>
+<td>Setting up kubectl on a Control Plane Node</td>
+</tr>
+<tr>
+<td>S7</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/kube-using.html">Using Kubernetes</a></td>
+<td>Getting Information about Nodes</td>
+</tr>
+<tr>
+<td>V1</td>
+<td><a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/networkingdetails.html">VirtualBox networking</a></td>
+<td>NAT Network Service</td>
+</tr>
+<tr>
+<td>V2</td>
+<td><a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/vboxmanage.html">VBoxManage reference</a></td>
+<td>VM, disk, storage, and network commands</td>
+</tr>
+<tr>
+<td>N1</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/editing-exports-file_task.html">OL9: Editing the /etc/exports File</a></td>
+<td>NFS package, exports, identity domain, firewall, service, verification; referenced exports(5) manual</td>
+</tr>
+<tr>
+<td>N2</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/mounting_task.html">OL9: Mounting an NFS Share</a></td>
+<td>Client package, mount, fstab; referenced nfs(5)/mount(8) manuals</td>
+</tr>
+<tr>
+<td>N3</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/xfs/xfs-CreatinganXFSFileSystem.html">OL9: Creating and Mounting an XFS File System</a></td>
+<td>Device identification, mkfs.xfs, mount, xfs_info</td>
+</tr>
+<tr>
+<td>N4</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/fsadmin/fsadmin-AbouttheFileSystemMountTable.html">OL9: Managing the File System Mount Table</a></td>
+<td>UUID identifiers and persistent filesystem mounts</td>
+</tr>
+<tr>
+<td>N5</td>
+<td><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/exportfs-command_reference.html">OL9: Using the exportfs Command</a></td>
+<td>Refresh and inspect exports</td>
+</tr>
+</tbody>
+</table>
+<p>The section titles above are the navigation pointers if the Oracle site does not position the page at a subsection. S1–S4 are the original Installation book. S5–S7 are its explicitly linked Kubernetes continuation. No Quick Install instructions are used in Part B. N1–N5 are separate Oracle Linux manuals supporting the user-requested NFS addition in Part D, not OCNE prerequisites.</p>
+<h1 id="part-b-oracles-full-installation-procedure">Part B — Oracle’s full installation procedure</h1>
+<h2 id="substitutions-used-in-oracles-examples">Substitutions used in Oracle’s examples</h2>
+<table>
+<thead>
+<tr>
+<th>Oracle example/input</th>
+<th>Value used in this lab</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>operator.example.com</code></td>
+<td><code>ocne-op.lab.test</code></td>
+</tr>
+<tr>
+<td><code>control1.example.com</code></td>
+<td><code>ocne-cp.lab.test</code></td>
+</tr>
+<tr>
+<td><code>worker1.example.com</code></td>
+<td><code>ocne-w1.lab.test</code></td>
+</tr>
+<tr>
+<td><code>worker2.example.com</code></td>
+<td><code>ocne-w2.lab.test</code></td>
+</tr>
+<tr>
+<td>Installation username, e.g. <code>oracle</code></td>
+<td><code>labadmin</code></td>
+</tr>
+<tr>
+<td><code>myenvironment</code></td>
+<td><code>homelab</code></td>
+</tr>
+<tr>
+<td><code>mycluster</code></td>
+<td><code>cluster1</code></td>
+</tr>
+<tr>
+<td>Platform API endpoint</td>
+<td><code>ocne-op.lab.test:8091</code></td>
+</tr>
+<tr>
+<td>ExternalIPs certificate directory</td>
+<td><code>$HOME/certificates/restrict_external_ip/</code>, the path recommended by S3’s certificate-generation subsection</td>
+</tr>
+</tbody>
+</table>
+<p>The service account <code>olcne</code> is created by packages. It is not the interactive installation user. All <code>olcnectl</code> commands below run as <code>labadmin</code> on the operator, except where another host is explicitly named. Do not combine these steps with the earlier <code>olcnectl provision</code> walkthrough on the same nodes.</p>
+<h2 id="b1-enable-oracle-linux-9-package-repositories">B1. Enable Oracle Linux 9 package repositories</h2>
+<p><strong>Observed package resolution:</strong> the oracle-olcne-release-el9 request resolved to oracle-ocne-release-el9 1.0-7. Enabled repository ol9_olcne19 supplied platform 1.9.6. Verify actual packages/repository IDs rather than inferring the OCNE stream from the release-package name. Preserve UEK R7.</p>
+<p><strong>Run on:</strong> all four VMs.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Enabling Access to the Software Packages → Oracle Linux 9 → Enabling Repositories with the Oracle Linux Yum Server</a>.</p>
+<pre><code class="language-bash">sudo dnf install oracle-olcne-release-el9
+
+sudo dnf config-manager --enable ol9_olcne19 ol9_addons ol9_baseos_latest ol9_appstream ol9_UEKR7
+
+sudo dnf config-manager --disable ol9_olcne18 ol9_olcne17
+
+sudo dnf repolist --enabled | grep developer
+</code></pre>
+<p>If developer repositories are listed, disable those IDs. Oracle provides this example:</p>
+<pre><code class="language-bash">sudo dnf config-manager --disable ol9_developer
+</code></pre>
+<p>Apply it to the actual returned repository IDs, including <code>ol9_developer_EPEL</code> if present. Oracle also says software from developer/EPEL repositories must not be installed on the Kubernetes nodes. Merely disabling a repository does not remove packages already installed from it.</p>
+<p>This is the UEK R7 branch. If hosts run RHCK instead, S2’s RHCK command omits <code>ol9_UEKR7</code>; use that branch consistently rather than mixing kernel assumptions. If <code>dnf config-manager</code> is missing, the host is not ready for the documented command; resolve the missing OS tooling using Oracle Linux documentation before proceeding. This revision does not insert an undocumented package-install workaround into the OCNE sequence.</p>
+<h2 id="b2-confirm-time-synchronization-and-registry-access">B2. Confirm time synchronization and registry access</h2>
+<p><strong>Applies to:</strong> all hosts; the time requirement specifically covers control-plane and worker nodes.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Setting up a Network Time Service; Accessing the Oracle Container Registry; Internet Access</a>.</p>
+<p>Oracle requires synchronized node time and recommends chronyd; it states chronyd is enabled and started by default on Oracle Linux. Ensure your host installation has working time synchronization before certificate generation. This section of the manual gives requirements rather than a copy/paste chrony configuration, so none is invented here.</p>
+<p>For this branch, every node needs access to Oracle’s registry. The module will use <code>container-registry.oracle.com/olcne</code>. If access requires a proxy or a registry mirror, use the corresponding sections in S2 and S3; the commands later in this guide assume direct access without a proxy.</p>
+<h2 id="b3-disable-swap-on-kubernetes-nodes">B3. Disable swap on Kubernetes nodes</h2>
+<p><strong>Run on:</strong> <code>ocne-cp</code>, <code>ocne-w1</code>, <code>ocne-w2</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Setting up the OS → Disabling Swap</a>.</p>
+<pre><code class="language-bash">sudo swapoff -a
+sudo cat /etc/fstab
+sudo cp /etc/fstab /etc/fstab_copy
+sudo sed -i '/\bswap\b/s/^/#/' /etc/fstab
+sudo cat /etc/fstab
+</code></pre>
+<p>Inspect the before/after file contents as Oracle instructs. Preserve an existing backup if you are revisiting this step. This requirement is for Kubernetes control-plane and worker nodes; the separate operator is not assigned a Kubernetes role in this topology.</p>
+<h2 id="b4-configure-the-non-ha-firewall-rules">B4. Configure the non-HA firewall rules</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Setting up the Network → Setting up the Firewall Rules → Non-HA Cluster Firewall Rules</a>.</p>
+<p>This branch keeps the default Oracle Linux firewalld service and uses Flannel. An external firewall, if present, must also allow the documented node-to-node traffic. Do not substitute Calico while retaining this procedure; Oracle documents different Calico prerequisites.</p>
+<p><strong>On <code>ocne-op</code>:</strong></p>
+<pre><code class="language-bash">sudo firewall-cmd --add-port=8091/tcp --permanent
+sudo systemctl restart firewalld.service
+</code></pre>
+<p><strong>On each worker, <code>ocne-w1</code> and <code>ocne-w2</code>:</strong></p>
+<pre><code class="language-bash">sudo firewall-cmd --zone=trusted --add-interface=cni0 --permanent
+sudo firewall-cmd --add-port=8090/tcp --permanent
+sudo firewall-cmd --add-port=10250/tcp --permanent
+sudo firewall-cmd --add-port=10255/tcp --permanent
+sudo firewall-cmd --add-port=8472/udp --permanent
+sudo systemctl restart firewalld.service
+</code></pre>
+<p><strong>On <code>ocne-cp</code>:</strong></p>
+<pre><code class="language-bash">sudo firewall-cmd --zone=trusted --add-interface=cni0 --permanent
+sudo firewall-cmd --add-port=8090/tcp --permanent
+sudo firewall-cmd --add-port=10250/tcp --permanent
+sudo firewall-cmd --add-port=10255/tcp --permanent
+sudo firewall-cmd --add-port=8472/udp --permanent
+sudo firewall-cmd --add-port=6443/tcp --permanent
+sudo systemctl restart firewalld.service
+</code></pre>
+<p>Port 10255 is included because it is explicitly in Oracle’s non-HA instructions; this guide has not silently edited that port list. The HA-only ports and load-balancer steps are not applicable to this single-control-plane branch.</p>
+<h2 id="b5-add-oracles-persistent-ol9-nftables-rule">B5. Add Oracle’s persistent OL9 nftables rule</h2>
+<p><strong>Run on:</strong> <code>ocne-cp</code>, <code>ocne-w1</code>, <code>ocne-w2</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Setting up Other Network Options → nftables Rule on Oracle Linux 9</a>.</p>
+<p>Oracle requires this when using OL9 with firewalld and recommends persistence across reboots. These are the rule and service from that section. They assume the referenced paths and firewalld chain exist; if a command fails, stop and inspect the mismatch rather than silently changing the rule.</p>
+<pre><code class="language-bash">sudo sh -c &quot;cat &gt; /etc/nftables/forward-policies.nft &lt;&lt; EOF
+flush chain inet firewalld filter_FORWARD_POLICIES_post
+
+table inet firewalld {
+        chain filter_FORWARD_POLICIES_post {
+                accept
+        }
+}
+EOF&quot;
+</code></pre>
+<pre><code class="language-bash">sudo sh -c &quot;cat &gt; /etc/systemd/system/forward-policies.service &lt;&lt; EOF
+[Unit]
+Description=Idempotent nftables rules for forward-policies
+PartOf=firewalld.service
+
+[Service]
+ExecStart=/sbin/nft -f /etc/nftables/forward-policies.nft
+ExecReload=/sbin/nft -f /etc/nftables/forward-policies.nft
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF&quot;
+</code></pre>
+<pre><code class="language-bash">sudo systemctl enable forward-policies.service
+sudo systemctl restart forward-policies.service
+</code></pre>
+<p>The recorded service successfully applied the rule and auto-restarted every 10 seconds, matching Restart=always. Verify Result/exit status and the actual accept rule after reboot; a restarting substate alone is not proof of failure. See <a href="TROUBLESHOOTING.md">Troubleshooting</a>.</p>
+<h2 id="b6-check-bridge-networking-prerequisites">B6. Check bridge networking prerequisites</h2>
+<p><strong>Run on:</strong> control plane and workers.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Flannel Network; br_netfilter Module; Bridge Tunable Parameters</a>.</p>
+<p>Check the module:</p>
+<pre><code class="language-bash">sudo lsmod|grep br_netfilter
+</code></pre>
+<p>If it is not loaded, Oracle supplies these commands:</p>
+<pre><code class="language-bash">sudo modprobe br_netfilter
+sudo sh -c 'echo &quot;br_netfilter&quot; &gt; /etc/modules-load.d/br_netfilter.conf'
+</code></pre>
+<p>Oracle states the kubeadm package creates <code>/etc/sysctl.d/k8s.conf</code> with the following values. This block is a reference, not a shell command to run now:</p>
+<pre><code class="language-text">net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+</code></pre>
+<p>Only if you change that file or create equivalent configuration, Oracle instructs you to reload it:</p>
+<pre><code class="language-bash">sudo /sbin/sysctl -p /etc/sysctl.d/k8s.conf
+</code></pre>
+<p>Do not run the conditional reload before the file exists. This guide does not install kubeadm independently; module installation handles the Kubernetes packages later.</p>
+<h2 id="b7-establish-ssh-key-authentication">B7. Establish SSH key authentication</h2>
+<p><strong>Run on:</strong> operator as <code>labadmin</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/prereq.html">S2 — Setting Up SSH Key-based Authentication</a>.</p>
+<pre><code class="language-bash">ssh-keygen
+</code></pre>
+<p>Follow Oracle’s example: accept the key location and leave the passphrase empty for this installation workflow. Do not overwrite an existing key. The subsequent commands assume <code>~/.ssh/id_rsa</code>, matching Oracle’s example; use the actual generated path if different.</p>
+<pre><code class="language-bash">ls -l /home/labadmin/.ssh/
+
+ssh-copy-id labadmin@ocne-op.lab.test
+ssh-copy-id labadmin@ocne-cp.lab.test
+ssh-copy-id labadmin@ocne-w1.lab.test
+ssh-copy-id labadmin@ocne-w2.lab.test
+</code></pre>
+<p>Enter the target account password when requested. Verify the identity of each host before accepting its SSH key. Test login to each node using the following commands <strong>one at a time</strong>, exiting the remote session before testing the next:</p>
+<pre><code class="language-bash">ssh labadmin@ocne-op.lab.test
+ssh labadmin@ocne-cp.lab.test
+ssh labadmin@ocne-w1.lab.test
+ssh labadmin@ocne-w2.lab.test
+</code></pre>
+<p>Authentication should succeed without an account-password prompt. Oracle includes the Platform API Server host among the targets, which is the operator in this layout.</p>
+<p>Completed access also includes Windows aliases and a full guest key mesh; see <a href="SSH-ACCESS.md">SSH access</a>. Password-free SSH does not grant noninteractive sudo. Read B10 before certificate distribution.</p>
+<h2 id="b8-install-the-platform-software-by-role">B8. Install the platform software by role</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">S3 — Setting up the Nodes → Setting up the Operator Node / Setting up Kubernetes Nodes</a>.</p>
+<p><strong>On the operator:</strong></p>
+<pre><code class="language-bash">sudo dnf install olcnectl olcne-api-server olcne-utils
+sudo systemctl enable olcne-api-server.service
+</code></pre>
+<p><strong>On the control plane and each worker:</strong></p>
+<pre><code class="language-bash">sudo dnf install olcne-agent olcne-utils
+sudo systemctl enable olcne-agent.service
+</code></pre>
+<p>Enable these services now; do not start them before certificate configuration.</p>
+<p>On Kubernetes nodes, <strong>only if the respective service is running</strong>, S3 instructs you to stop and disable Docker/containerd:</p>
+<pre><code class="language-bash">sudo systemctl disable --now docker.service
+sudo systemctl disable --now containerd.service
+</code></pre>
+<p>These are conditional instructions; absent services on a clean host do not need to be installed or created.</p>
+<p><strong>Service-account requirement:</strong> S2 → Configuring Access for the Platform Agent requires the package-created <code>olcne</code> user to use sudo without a real tty and to run scripts in <code>/etc/olcne/scripts</code> without a password. S3 says not to use that service user for another purpose. Verify the package-provided configuration meets those requirements. Neither section supplies the earlier blanket <code>labadmin NOPASSWD: ALL</code> rule, so it is not included. If local policy blocks the documented operations, retain the exact error and resolve that access requirement explicitly.</p>
+<h2 id="b9-prepare-the-operator-user-for-certificate-management">B9. Prepare the operator user for certificate management</h2>
+<p><strong>Run on:</strong> operator.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">S3 — Setting up Certificates for Kubernetes Nodes → Setting up Private CA Certificates → Distribute Node Certificates</a>.</p>
+<pre><code class="language-bash">sudo usermod -a -G olcne labadmin
+</code></pre>
+<p>Log out and log back in as <code>labadmin</code> so the new group membership applies. The account-name substitution is the only change to Oracle’s example at this step.</p>
+<p>Oracle recommends a secrets manager such as Vault for certificate lifecycle management, and also documents private CA certificates for testing. This walkthrough selects the latter documented branch; these certificates require manual renewal.</p>
+<h2 id="b10-generate-node-certificates-and-copy-with-interactive-sudo">B10. Generate node certificates and copy with interactive sudo</h2>
+<p><strong>Run first on ocne-op as labadmin. Source S3: node certificate generation/distribution.</strong> The original automated distribute command generated certificates then failed on noninteractive sudo. This manual alternative uses the same Oracle-generated files and verified destination ownership, with local scp/interactive-sudo transport so the reader does not need blanket passwordless sudo or temporary root SSH. It is a documented manual alternative, not a claim this exact alternative was executed during the original build.</p>
+<p>For a <strong>new PKI only</strong>, after confirming no certificates directory exists:</p>
+<pre><code class="language-bash">cd &quot;$HOME&quot;
+umask 077
+test ! -e &quot;$HOME/certificates&quot;
+olcnectl certificates generate --nodes ocne-op.lab.test,ocne-cp.lab.test,ocne-w1.lab.test,ocne-w2.lab.test --cert-dir &quot;$HOME/certificates&quot;
+ls -ld &quot;$HOME/certificates&quot; &quot;$HOME/certificates/ca&quot;
+</code></pre>
+<p>If certificates already exist after a failed distribute, <strong>skip generation</strong> and inspect/reuse them. Never regenerate the CA as a transport retry. For each node, verify node.cert against ca/ca.cert before copying:</p>
+<pre><code class="language-bash">for node in ocne-op ocne-cp ocne-w1 ocne-w2; do
+  openssl verify -CAfile &quot;$HOME/certificates/ca/ca.cert&quot; &quot;$HOME/certificates/$node.lab.test/node.cert&quot;
+  openssl x509 -in &quot;$HOME/certificates/$node.lab.test/node.cert&quot; -noout -subject -dates -ext subjectAltName
+done
+</code></pre>
+<p>Expected: each certificate verifies OK and names/validity match the intended node. Using the already-verified SSH mesh, stage only that node's certificate/key and CA <strong>certificate</strong>, never the CA private key:</p>
+<pre><code class="language-bash">for node in ocne-op ocne-cp ocne-w1 ocne-w2; do
+  ssh &quot;$node.lab.test&quot; 'umask 077; test ! -e ~/.ocne-cert-stage; mkdir -m 0700 ~/.ocne-cert-stage' || break
+  scp &quot;$HOME/certificates/ca/ca.cert&quot; &quot;$HOME/certificates/$node.lab.test/node.cert&quot; &quot;$HOME/certificates/$node.lab.test/node.key&quot; &quot;$node.lab.test:.ocne-cert-stage/&quot; || break
+done
+</code></pre>
+<p>Inspect completion for all four nodes. If staging exists from a partial run, inspect its hashes/permissions rather than overwriting blindly. <strong>Log into each node as labadmin</strong>, use interactive sudo and run:</p>
+<pre><code class="language-bash">set -euo pipefail
+sudo -v
+sudo test ! -e /etc/olcne/certificates/node.key
+# If a destination already exists, stop and compare it rather than replacing trust.
+sudo install -d -o olcne -g olcne -m 0755 /etc/olcne/certificates
+sudo install -o olcne -g olcne -m 0600 ~/.ocne-cert-stage/ca.cert /etc/olcne/certificates/ca.cert
+sudo install -o olcne -g olcne -m 0600 ~/.ocne-cert-stage/node.cert /etc/olcne/certificates/node.cert
+sudo install -o olcne -g olcne -m 0600 ~/.ocne-cert-stage/node.key /etc/olcne/certificates/node.key
+sudo restorecon -RF /etc/olcne/certificates
+sudo openssl verify -CAfile /etc/olcne/certificates/ca.cert /etc/olcne/certificates/node.cert
+sudo stat -c '%a %U:%G %n' /etc/olcne/certificates/ca.cert /etc/olcne/certificates/node.cert /etc/olcne/certificates/node.key
+</code></pre>
+<p>Expected metadata matches the executed lab: owner/group olcne:olcne, file modes0600. Verify the public key derived from the private key matches the certificate; these commands display only hashes:</p>
+<pre><code class="language-bash">sudo openssl pkey -in /etc/olcne/certificates/node.key -pubout -outform DER | sha256sum
+sudo openssl x509 -in /etc/olcne/certificates/node.cert -pubkey -noout | openssl pkey -pubin -outform DER | sha256sum
+</code></pre>
+<p>The hashes must match, and each preceding command must succeed. This is not a dump of private-key contents. After verifying the installed copy, remove only the temporary staging files:</p>
+<pre><code class="language-bash">rm -- ~/.ocne-cert-stage/ca.cert ~/.ocne-cert-stage/node.cert ~/.ocne-cert-stage/node.key
+rmdir -- ~/.ocne-cert-stage
+</code></pre>
+<p>Keep the protected source PKI on the operator for B11/B12; securely back up its CA key separately. The actual run instead used Oracle certificates copy with temporary restricted root SSH, then removed that access; its detailed historical recovery is included later in this chapter. Do not perform both paths on the same certificates.</p>
+<h2 id="b11-generate-certificates-for-the-cli-to-api-connection">B11. Generate certificates for the CLI-to-API connection</h2>
+<p><strong>Run on:</strong> operator as <code>labadmin</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">S3 — Setting up Certificates for the Platform CLI to the Platform API Server → Generate Certificates for the Platform CLI to the Platform API Server</a>.</p>
+<p>Use the operator’s actual hostname and IP as the documented substitutions:</p>
+<pre><code class="language-bash">olcnectl certificates generate \
+  --nodes ocne-op.lab.test,192.168.77.10 \
+  --cert-dir $HOME/.olcne/certificates/ocne-op.lab.test:8091/ \
+  --byo-ca-cert $HOME/certificates/ca/ca.cert \
+  --byo-ca-key $HOME/certificates/ca/ca.key \
+  --one-cert
+
+cp $HOME/certificates/ca/ca.cert \
+  $HOME/.olcne/certificates/ocne-op.lab.test:8091/
+</code></pre>
+<p>The endpoint in B14 uses this same hostname and port so it matches the CLI certificate directory. Do not switch the endpoint to <code>127.0.0.1:8091</code> while expecting a hostname-specific directory to be selected automatically.</p>
+<h2 id="b12-generate-the-externalips-service-certificates">B12. Generate the externalIPs service certificates</h2>
+<p><strong>Run on:</strong> operator as <code>labadmin</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">S3 — Setting up Certificates for the externalIPs Kubernetes Service → Setting up Private CA Certificates → Generate Certificates for ExternalIPs Service</a>.</p>
+<p>The service names below are Oracle’s service DNS names. Do not replace them with VM hostnames.</p>
+<pre><code class="language-bash">olcnectl certificates generate \
+  --nodes externalip-validation-webhook-service.externalip-validation-system.svc,externalip-validation-webhook-service.externalip-validation-system.svc.cluster.local \
+  --cert-dir $HOME/certificates/restrict_external_ip/ \
+  --byo-ca-cert $HOME/certificates/ca/ca.cert \
+  --byo-ca-key $HOME/certificates/ca/ca.key \
+  --one-cert
+
+cp $HOME/certificates/ca/ca.cert $HOME/certificates/restrict_external_ip/
+</code></pre>
+<p>S3 recommends the home-directory path in this generation subsection. S5’s module example uses an <code>/etc/olcne/...</code> path; C1 substitutes the actual path generated here, as S3 explicitly instructs.</p>
+<h2 id="b13-start-the-services-using-file-certificates">B13. Start the services using file certificates</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">S3 — Starting the Platform API Server and Platform Agent Services → Starting the Services Using Certificates</a>.</p>
+<p><strong>On the operator:</strong></p>
+<pre><code class="language-bash">sudo /etc/olcne/bootstrap-olcne.sh \
+  --secret-manager-type file \
+  --olcne-component api-server
+
+systemctl status olcne-api-server.service
+</code></pre>
+<p><strong>On the control plane and each worker:</strong></p>
+<pre><code class="language-bash">sudo /etc/olcne/bootstrap-olcne.sh \
+  --secret-manager-type file \
+  --olcne-component agent
+
+systemctl status olcne-agent.service
+</code></pre>
+<p>These commands use <code>/etc/olcne/certificates/</code>, the default node-certificate directory populated in B10. Check that the services are running before creating the environment.</p>
+<h2 id="b14-create-the-environment">B14. Create the environment</h2>
+<p><strong>Run on:</strong> operator as <code>labadmin</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/env-create.html">S4 — Creating an Environment using Certificates</a>.</p>
+<p>Because B11 configured the CLI’s default certificate directory, use the documented form without explicit key paths:</p>
+<pre><code class="language-bash">olcnectl environment create \
+  --api-server ocne-op.lab.test:8091 \
+  --environment-name homelab \
+  --secret-manager-type file \
+  --update-config
+</code></pre>
+<p><code>--update-config</code> records the environment connection settings for later CLI calls. Oracle states that a node must not be used in more than one environment.</p>
+<h1 id="part-c-kubernetes-continuation-linked-by-oracle">Part C — Kubernetes continuation linked by Oracle</h1>
+<h2 id="c1-create-the-single-control-plane-module">C1. Create the single-control-plane module</h2>
+<p><strong>Run on:</strong> operator as <code>labadmin</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/deploy-kube-intro.html">S5 — Creating a Kubernetes Module → Creating a Cluster with a Single Control Plane Node</a>.</p>
+<pre><code class="language-bash">olcnectl module create \
+  --environment-name homelab \
+  --module kubernetes --name cluster1 \
+  --container-registry container-registry.oracle.com/olcne \
+  --control-plane-nodes ocne-cp.lab.test:8090 \
+  --worker-nodes ocne-w1.lab.test:8090,ocne-w2.lab.test:8090 \
+  --selinux enforcing \
+  --restrict-service-externalip-ca-cert $HOME/certificates/restrict_external_ip/ca.cert \
+  --restrict-service-externalip-tls-cert $HOME/certificates/restrict_external_ip/node.cert \
+  --restrict-service-externalip-tls-key $HOME/certificates/restrict_external_ip/node.key
+</code></pre>
+<p>This is Oracle’s single-control-plane command with the substitution table applied. S5 documents Flannel as the default CNI and no load balancer for this topology. It also describes enforcing as the default/recommended OS SELinux mode and requires the corresponding module option when the hosts use it. This guide does not disable SELinux.</p>
+<h2 id="c2-validate-before-installing">C2. Validate before installing</h2>
+<p><strong>Run on:</strong> operator.<br>
+<strong>Source:</strong> S5 → Validating a Kubernetes Module.</p>
+<pre><code class="language-bash">olcnectl module validate \
+  --environment-name homelab \
+  --name cluster1
+</code></pre>
+<p>If validation reports failures, Oracle’s documented way to produce node-specific corrective scripts is:</p>
+<pre><code class="language-bash">olcnectl module validate \
+  --environment-name homelab \
+  --name cluster1 \
+  --generate-scripts
+</code></pre>
+<p>Oracle names the generated scripts using <code>hostname:8090.sh</code>. Review the generated commands and run each script on its corresponding Linux node, then repeat validation. Do not proceed to installation while validation failures remain. Keep these files on Linux; their colon-containing filenames are not suitable for an ordinary Windows filename.</p>
+<h2 id="c3-install-and-report">C3. Install and report</h2>
+<p><strong>Run on:</strong> operator.<br>
+<strong>Source:</strong> S5 → Installing a Kubernetes Module; Reporting Information about the Kubernetes Module.</p>
+<pre><code class="language-bash">olcnectl module install \
+  --environment-name homelab \
+  --name cluster1
+</code></pre>
+<p>After it completes successfully:</p>
+<pre><code class="language-bash">olcnectl module report \
+  --environment-name homelab \
+  --name cluster1 \
+  --children
+</code></pre>
+<p>Flannel image downloads took several minutes, and worker2 restarted twice while dependencies initialized. Inspect events, transfer progress and service logs before treating a slow install as stalled; do not launch a second installation. After install/report, continue through C5. See <a href="TROUBLESHOOTING.md">Troubleshooting</a> for the later report-detail discrepancy.</p>
+<p>Oracle describes Kubernetes package installation and starting CRI-O/kubelet as part of module installation. Do not create a parallel cluster using a separate kubeadm installation procedure.</p>
+<h2 id="c4-configure-kubectl-on-the-control-plane">C4. Configure kubectl on the control plane</h2>
+<p><strong>Run on:</strong> <code>ocne-cp</code>, as <code>labadmin</code>, from the user’s home directory.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/kubectl-intro.html">S6 — Setting up kubectl on a Control Plane Node</a>.</p>
+<pre><code class="language-bash">mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+export KUBECONFIG=$HOME/.kube/config
+echo 'export KUBECONFIG=$HOME/.kube/config' &gt;&gt; $HOME/.bashrc
+
+kubectl get deployments --all-namespaces
+</code></pre>
+<p>These are Oracle’s commands. Apply the persistent shell-profile addition once. This configuration gives the user administrative access to the cluster.</p>
+<h2 id="c5-verify-the-node-state">C5. Verify the node state</h2>
+<p><strong>Run on:</strong> <code>ocne-cp</code>.<br>
+<strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/kube-using.html">S7 — Getting Information about Nodes</a>.</p>
+<pre><code class="language-bash">kubectl get nodes
+</code></pre>
+<p>Expected shape, with actual ages and versions supplied by your installation:</p>
+<pre><code class="language-text">NAME                STATUS   ROLES
+ocne-cp.lab.test     Ready    control-plane
+ocne-w1.lab.test     Ready    &lt;none&gt;
+ocne-w2.lab.test     Ready    &lt;none&gt;
+</code></pre>
+<p>Oracle’s example also shows <code>&lt;none&gt;</code> for worker roles. The separate operator is not a Kubernetes node in this design. To inspect one worker, substitute its name into Oracle’s documented describe command:</p>
+<pre><code class="language-bash">kubectl describe nodes ocne-w1.lab.test
+</code></pre>
+<p>Completion requires successful validation/install, all three nodes Ready, intended deployment replicas available/updated, and <strong>live pod Ready conditions</strong>, not deployment counters alone:</p>
+<pre><code class="language-bash">kubectl get deployments --all-namespaces
+kubectl get pods --all-namespaces -o wide
+kubectl wait --for=condition=Ready pods --all --all-namespaces --timeout=180s
+</code></pre>
+<p>These local acceptance checks supplement Oracle's node/report procedure. Verify-Kubernetes-Ready.sh also checks node, deployment and pod JSON; see <a href="OPERATING-LAB.md">Operating the lab</a>. It applies to the original base lab without completed Jobs. Repeat after an ordered power cycle.</p>
+<p>At final acceptance, three nodes, 15 pods and all four deployments were Ready/available. The later report returned healthy but contained kernel/firewall details inconsistent with direct guest checks; see <a href="TROUBLESHOOTING.md">Troubleshooting</a>. Do not infer readiness from report status alone. Database Operator, database, ASM and RAC remain separate tasks.</p>
+<h1 id="part-d-additional-100-gib-nfs-server-on-the-operator">Part D — Additional 100 GiB NFS server on the operator</h1>
+<p>This is the user's requested addition. <strong>It is not a requirement or procedure in the OCNE 1.9 Host Requirements page.</strong> It follows Oracle Linux 9's NFS, XFS, and filesystem manuals, identified below. The disk size, paths, addresses, account, and selection of NFSv4.1 are lab inputs. Shell guards and validation checks are local implementation around the documented commands.</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NFS server</td>
+<td><code>ocne-op.lab.test</code> / <code>192.168.77.10</code></td>
+</tr>
+<tr>
+<td>Additional disk</td>
+<td>100 GiB (102400 MiB), separate from the existing 100 GiB OS disk</td>
+</tr>
+<tr>
+<td>Windows disk file</td>
+<td><code>D:\OCNE19-Lab\vms\ocne-op\ocne-op-nfs.vdi</code></td>
+</tr>
+<tr>
+<td>Server filesystem</td>
+<td>XFS mounted at <code>/srv/nfs</code></td>
+</tr>
+<tr>
+<td>Export</td>
+<td><code>/srv/nfs/share</code></td>
+</tr>
+<tr>
+<td>Allowed hosts</td>
+<td>Operator <code>.10</code>, control plane <code>.11</code>, worker 1 <code>.12</code>, worker 2 <code>.13</code></td>
+</tr>
+<tr>
+<td>Remote client mount</td>
+<td><code>/mnt/ocne-share</code> on the control plane and both workers</td>
+</tr>
+<tr>
+<td>Operator access</td>
+<td>Directly through <code>/srv/nfs/share</code>, the same underlying files</td>
+</tr>
+<tr>
+<td>Protocol</td>
+<td>NFSv4.1 over the internal VM network</td>
+</tr>
+</tbody>
+</table>
+<p>This is <strong>one shared 100 GiB capacity</strong>, not 100 GiB per client. Filesystem metadata reduces usable space. RAM remains 4/8/22/22 GiB. The operator now performs both OCNE management and NFS service; the existing low-memory exception still applies. All virtual disks together have 700 GiB capacity. Dynamic VDI files grow as written; plan physical Windows storage for growth and snapshots.</p>
+<p>Complete Parts A–C first. Add NFS before deploying workloads that need shared files. Do not restart or shut down the operator while clients are actively using NFS. Start the operator before clients; stop clients before the operator.</p>
+<h2 id="d1-add-the-dedicated-disk-windowsvirtualbox">D1. Add the dedicated disk — Windows/VirtualBox</h2>
+<p><strong>Source:</strong> V2 → <code>VBoxManage createmedium</code>, <code>storagectl</code>, <code>storageattach</code>, and <code>showmediuminfo</code>. Disk placement and size are local choices. Use the checked-in project script below.</p>
+<p>On <code>ocne-op</code>, record the existing disks, then shut down cleanly:</p>
+<pre><code class="language-bash">lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL,SERIAL
+sudo shutdown -h now
+</code></pre>
+<p>After VirtualBox shows <strong>Powered Off</strong>, run in Windows PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+.\scripts\05-Add-NFS-Disk.ps1
+</code></pre>
+<p>The script attaches a fresh disk on SATA port 2. It refuses to overwrite an existing VDI or occupied disk attachment. Start <code>ocne-op</code> in VirtualBox Manager and reconnect:</p>
+<pre><code class="language-powershell">ssh -p 2220 labadmin@127.0.0.1
+</code></pre>
+<h2 id="d2-identify-and-format-only-the-new-blank-disk-operator">D2. Identify and format ONLY the new blank disk — operator</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/xfs/xfs-CreatinganXFSFileSystem.html">N3 — Creating and Mounting an XFS File System</a>, steps 1–4. Oracle allows an entire disk as the XFS device. <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/fsadmin/fsadmin-AbouttheFileSystemMountTable.html">N4 — Managing the File System Mount Table</a>, Editing <code>/etc/fstab</code> For Persistent Mounts.</p>
+<pre><code class="language-bash">lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,MODEL,SERIAL
+ls -l /dev/disk/by-id/
+</code></pre>
+<p>Compare with D1 and the newly attached VirtualBox medium. <strong>Do not assume <code>/dev/sdb</code>. Both operator disks are 100 GiB. Formatting the OS disk would destroy it.</strong> Identify the new blank whole disk with no partitions, filesystem, or mounts. Enter its actual path at the prompt below. The guards reject common mismatches; they do not replace checking the disk's identity.</p>
+<p>Run this block only once for a fresh disk. If it stops, inspect the state before continuing. For an existing NFS disk, mount its existing filesystem; do not format it again.</p>
+<pre><code class="language-bash">read -r -p 'Actual NEW blank NFS disk path (for example a /dev/disk/by-id/ path): ' NFS_DISK
+sudo bash -s -- &quot;$NFS_DISK&quot; &lt;&lt;'NFS_DISK_SETUP'
+set -euo pipefail
+disk=$(readlink -f -- &quot;$1&quot;)
+[[ -b &quot;$disk&quot; ]] || { echo 'Not a block device'; exit 1; }
+[[ $(lsblk -dn -o TYPE &quot;$disk&quot;) == disk ]] || { echo 'Not a whole disk'; exit 1; }
+[[ $(blockdev --getsize64 &quot;$disk&quot;) == 107374182400 ]] || { echo 'Not the expected 100 GiB disk'; exit 1; }
+[[ $(lsblk -nr -o NAME &quot;$disk&quot; | wc -l) -eq 1 ]] || { echo 'Disk has child devices; stop'; exit 1; }
+[[ -z $(lsblk -nr -o MOUNTPOINTS &quot;$disk&quot; | tr -d '[:space:]') ]] || { echo 'Disk is mounted'; exit 1; }
+signatures=$(wipefs -n --noheadings &quot;$disk&quot;)
+[[ -z &quot;$signatures&quot; ]] || { echo 'Disk has existing signatures'; exit 1; }
+if mountpoint -q /srv/nfs || grep -Eq '^[^#]*[[:space:]]/srv/nfs[[:space:]]' /etc/fstab; then
+    echo 'Existing /srv/nfs mount/configuration: inspect instead of repeating'; exit 1
+fi
+if [[ -d /srv/nfs ]] &amp;&amp; [[ -n $(ls -A /srv/nfs) ]]; then
+    echo '/srv/nfs is not empty'; exit 1
+fi
+mkfs.xfs &quot;$disk&quot;
+uuid=$(blkid -s UUID -o value &quot;$disk&quot;)
+[[ -n &quot;$uuid&quot; ]]
+mkdir -p /srv/nfs
+cp -p /etc/fstab &quot;/etc/fstab.before-nfs-$(date +%Y%m%d%H%M%S)&quot;
+printf 'UUID=%s /srv/nfs xfs defaults 0 0\n' &quot;$uuid&quot; &gt;&gt; /etc/fstab
+systemctl daemon-reload
+mount /srv/nfs
+mountpoint -q /srv/nfs
+xfs_info /srv/nfs
+NFS_DISK_SETUP
+</code></pre>
+<p>Check the block completed successfully, then verify:</p>
+<pre><code class="language-bash">findmnt /srv/nfs
+df -hT /srv/nfs
+</code></pre>
+<p>The server's data disk is a required boot mount. If it becomes unavailable, repair that mount before starting NFS; do not create a replacement share on the operator's OS filesystem.</p>
+<h2 id="d3-install-nfs-utilities-and-check-identities-all-four-nodes">D3. Install NFS utilities and check identities — all four nodes</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/editing-exports-file_task.html">N1 — Editing the /etc/exports File</a>, steps 1 and 3; <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/mounting_task.html">N2 — Mounting an NFS Share</a>, step 1. N1 refers to <code>exports(5)</code> for access/identity options.</p>
+<p>Run on each of <code>ocne-op</code>, <code>ocne-cp</code>, <code>ocne-w1</code>, and <code>ocne-w2</code>:</p>
+<pre><code class="language-bash">sudo dnf install nfs-utils
+id labadmin
+sudo vi /etc/idmapd.conf
+</code></pre>
+<p>In the existing <code>[General]</code> section, set exactly one active Domain entry:</p>
+<pre><code class="language-ini">[General]
+Domain = lab.test
+</code></pre>
+<p>Preserve the rest of the file. Use the same domain on all four hosts before their first NFS use. Confirm that <code>labadmin</code> has the same numeric UID and primary GID on every node. NFS filesystem permissions use these identities. If they differ, resolve the account mapping before continuing; do not blindly renumber an account already owning files. The <code>id</code> check is a local preflight check, not an OCNE installation requirement.</p>
+<h2 id="d4-create-and-export-the-shared-directory-operator-only">D4. Create and export the shared directory — operator only</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/editing-exports-file_task.html">N1 — Editing the /etc/exports File</a>, steps 2–4 and 6–8. For export options, use the <code>exports(5)</code> manual referenced by that page (<code>man 5 exports</code> on the operator). <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/exportfs-command_reference.html">N5 — Using the exportfs Command</a>.</p>
+<p>First confirm the XFS data disk is mounted. Create a directory writable by the shared <code>labadmin</code> identity:</p>
+<pre><code class="language-bash">sudo bash &lt;&lt;'NFS_SHARE_DIRECTORY'
+set -euo pipefail
+mountpoint -q /srv/nfs || { echo 'NFS data disk is not mounted'; exit 1; }
+mkdir -p /srv/nfs/share
+chown labadmin:&quot;$(id -gn labadmin)&quot; /srv/nfs/share
+chmod 0770 /srv/nfs/share
+NFS_SHARE_DIRECTORY
+</code></pre>
+<p>Preserve any existing exports. Back up and edit the file:</p>
+<pre><code class="language-bash">sudo cp -p /etc/exports &quot;/etc/exports.before-ocne-nfs-$(date +%Y%m%d%H%M%S)&quot;
+sudo vi /etc/exports
+</code></pre>
+<p>Add this <strong>single line</strong>, once:</p>
+<pre><code class="language-text">/srv/nfs/share 192.168.77.10(rw,sync,root_squash) 192.168.77.11(rw,sync,root_squash) 192.168.77.12(rw,sync,root_squash) 192.168.77.13(rw,sync,root_squash)
+</code></pre>
+<p><code>rw</code> permits writes subject to filesystem permissions; <code>sync</code> waits for stable storage; <code>root_squash</code> retains the normal protection against remote root being treated as server root. Test writes as <code>labadmin</code>, not with <code>sudo</code>. This permits the four lab addresses only.</p>
+<p>Inspect the zone used by the operator's lab network interface:</p>
+<pre><code class="language-bash">sudo firewall-cmd --get-active-zones
+sudo firewall-cmd --get-default-zone
+</code></pre>
+<p>Enter the actual zone associated with that interface (or its default zone when no explicit interface zone is assigned). Apply Oracle's NFSv4 firewall rule in both runtime and permanent configuration:</p>
+<pre><code class="language-bash">read -r -p 'Actual firewalld zone for the lab interface: ' NFS_ZONE
+sudo firewall-cmd --zone=&quot;$NFS_ZONE&quot; --add-service=nfs
+sudo firewall-cmd --permanent --zone=&quot;$NFS_ZONE&quot; --add-service=nfs
+sudo systemctl enable --now nfs-server
+sudo exportfs -ra
+sudo /usr/sbin/exportfs -v
+sudo cat /proc/fs/nfsd/versions
+</code></pre>
+<p>Confirm the export lists the four intended addresses and that the versions include <code>+4.1</code>. These firewall changes are on the operator only and permit NFSv4 on TCP 2049. No Windows port-forward is needed for VM-to-VM NFS. Preserve the existing OCNE rules and SELinux configuration. Remote <code>showmount</code> requires additional RPC access; this walkthrough verifies exports on the server and tests actual NFSv4 mounts instead.</p>
+<h2 id="d5-mount-the-share-persistently-control-plane-and-both-workers">D5. Mount the share persistently — control plane and both workers</h2>
+<p><strong>Source:</strong> <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/mounting_task.html">N2 — Mounting an NFS Share</a>, steps 3–4 and its referenced <code>nfs(5)</code>/<code>mount(8)</code> manual pages. The source illustrates read-only mounting; this lab selects read/write access matching D4, and explicitly requests NFSv4.1.</p>
+<p>Run on each of <code>ocne-cp</code>, <code>ocne-w1</code>, and <code>ocne-w2</code> after completing D3 there:</p>
+<pre><code class="language-bash">sudo mkdir -p /mnt/ocne-share
+ls -la /mnt/ocne-share
+findmnt -M /mnt/ocne-share
+</code></pre>
+<p><strong>For existing clients, inspect findmnt first.</strong> If the correct source/version/options are mounted, verify them and the persistent entry instead of mounting again. The helper’s redundant second mount caused access denied on an already-mounted root-squashed path and was removed; protections were retained.</p>
+<p>Before the first mount, the directory must be empty and not already mounted (<code>findmnt</code> returns no match). Inspect existing content rather than covering it with a mount. Then:</p>
+<pre><code class="language-bash">sudo mount -t nfs -o rw,vers=4.1,hard,nosuid 192.168.77.10:/srv/nfs/share /mnt/ocne-share
+findmnt /mnt/ocne-share
+df -hT /mnt/ocne-share
+</code></pre>
+<p>For persistence, back up and edit <code>/etc/fstab</code>:</p>
+<pre><code class="language-bash">sudo cp -p /etc/fstab &quot;/etc/fstab.before-ocne-nfs-$(date +%Y%m%d%H%M%S)&quot;
+sudo vi /etc/fstab
+</code></pre>
+<p>Add this single entry once:</p>
+<pre><code class="language-text">192.168.77.10:/srv/nfs/share /mnt/ocne-share nfs rw,vers=4.1,hard,nosuid,_netdev 0 0
+</code></pre>
+<p>Then:</p>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+# Already mounted above: verify the mount directly; persistence is tested at D6.
+findmnt -M /mnt/ocne-share
+</code></pre>
+<p><code>hard</code> mounts wait for the server to recover during an outage; this can block file access. <code>_netdev</code> identifies network storage for boot ordering. The operator accesses these same files locally at <code>/srv/nfs/share</code>; it does not need to mount its own export over NFS.</p>
+<h2 id="d6-verify-sharing-from-all-four-nodes">D6. Verify sharing from all four nodes</h2>
+<p>These are local acceptance checks for the documented export and mounts. They do not claim Kubernetes storage integration.</p>
+<p>On each remote client, logged in as <code>labadmin</code>:</p>
+<pre><code class="language-bash">printf 'NFS write from %s\n' &quot;$(hostname -s)&quot; &gt; &quot;/mnt/ocne-share/nfs-check-$(hostname -s).txt&quot;
+ls -ln /mnt/ocne-share
+</code></pre>
+<p>On the operator, also as <code>labadmin</code>:</p>
+<pre><code class="language-bash">printf 'NFS write from operator\n' &gt; /srv/nfs/share/nfs-check-ocne-op.txt
+cat /srv/nfs/share/nfs-check-*.txt
+</code></pre>
+<p>Back on each client:</p>
+<pre><code class="language-bash">cat /mnt/ocne-share/nfs-check-*.txt
+</code></pre>
+<p>All four messages should be visible on every node. Permission failures require checking numeric IDs, ownership, mode, export entries, and any actual SELinux denials; do not fix them with <code>chmod 777</code>, <code>no_root_squash</code>, or disabling SELinux.</p>
+<p>Before putting workload data here, verify persistence across an orderly lab shutdown/startup: stop clients first; start the operator first and verify <code>/srv/nfs</code> and its export; then start clients and check <code>/mnt/ocne-share</code>. Record actual results in <code>docs/RUN-LOG.md</code>.</p>
+<p><strong>Scope:</strong> this creates host-level shared storage. It does not create a Kubernetes PV, PVC, StorageClass, or NFS provisioner, and it does not establish suitability for Oracle Database/RAC storage. Those require their own documented configuration. The operator and its Windows disk remain a single point of failure; the Git repository contains setup instructions, not NFS data backups.</p>
+<h3 id="1b14-certificate-distribution-recovery-reference">1b.14 Certificate distribution recovery reference</h3>
+<p>This supplements installation guide B9–B13. The completed lab already has functioning certificates and services; do not regenerate or redistribute them as a routine health check.</p>
+<p>Oracle procedure: <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/install.html">Installing OCNE 1.9</a>, certificate and startup sections; <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/olcnectl/commands.html">Platform CLI commands</a>, Certificates Copy/Distribute. The temporary SSH authorization and transport cleanup below are local orchestration, not additional Oracle requirements.</p>
+<h2 id="check-privileges-before-distribution">Check privileges before distribution</h2>
+<p>Password-free SSH as labadmin does not imply password-free sudo. In this lab, labadmin keeps password-required sudo; the package-created olcne account has its separate package-provided scope for /etc/olcne/scripts.</p>
+<p>Before a new installation's distribution step, verify node resolution, time, host-key pins, SSH authentication, the operator's olcne group membership, and the actual remote privilege path. A noninteractive copy cannot depend on an unseen password prompt. Do not solve this with blanket labadmin NOPASSWD rules.</p>
+<p>If generation succeeded but copying failed, inspect existing files and retain the CA/node material. Determine which destination copies completed before attempting recovery. Regenerating the CA can break trust in already configured components.</p>
+<h2 id="what-happened-in-this-lab">What happened in this lab</h2>
+<ol>
+<li>Guide B10's distribute operation ran as labadmin and generated the PKI, then failed on noninteractive sudo.</li>
+<li>The generated material under /home/labadmin/certificates was preserved.</li>
+<li>A temporary operator public key was added to root's authorized_keys on the four clones, restricted to source 192.168.77.10, with agent/port/X11 forwarding and PTY disabled. Existing root keys were preserved.</li>
+<li>The documented copy command ran as root on the operator, using the existing PKI and pinned SSH identities.</li>
+<li>Destination certificate files, ownership, chain validation and subsequently running services were independently checked.</li>
+<li>The copy transport remained stuck after copying. The specifically identified copy process and orphaned SSH transports were terminated after verification; this was not recorded as a normal successful command exit.</li>
+<li>The exact temporary root authorization was removed from every clone and absence verified.</li>
+</ol>
+<p>The recorded copy command, for reference only:</p>
+<pre><code class="language-bash"># Historical recovery: root on ocne-op, after reviewed temporary access was established.
+cd /home/labadmin
+olcnectl certificates copy \
+  --cert-dir /home/labadmin/certificates \
+  --nodes ocne-op.lab.test,ocne-cp.lab.test,ocne-w1.lab.test,ocne-w2.lab.test \
+  --ssh-identity-file /home/labadmin/.ssh/id_rsa \
+  --ssh-login-name root \
+  --remote-command 'ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/labadmin/.ssh/known_hosts'
+</code></pre>
+<p>Do not paste this onto a healthy lab. A future failed distribution requires a fresh inspection of policy, identity, PKI and process state. Temporary root access was removed, not retained as the permanent mesh.</p>
+<h2 id="verification-before-service-bootstrap">Verification before service bootstrap</h2>
+<p>On each intended guest, as an authorized administrator:</p>
+<pre><code class="language-bash">sudo test -s /etc/olcne/certificates/ca.cert
+sudo test -s /etc/olcne/certificates/node.cert
+sudo test -s /etc/olcne/certificates/node.key
+sudo openssl verify \
+  -CAfile /etc/olcne/certificates/ca.cert \
+  /etc/olcne/certificates/node.cert
+sudo openssl x509 -in /etc/olcne/certificates/node.cert \
+  -noout -subject -issuer -dates -ext subjectAltName
+sudo stat -c '%a %U:%G %n' /etc/olcne/certificates/ca.cert \
+  /etc/olcne/certificates/node.cert /etc/olcne/certificates/node.key
+</code></pre>
+<p>Check every command result, intended certificate identity, validity, correct ownership for the platform service and restrictive private-key access. These commands display metadata, not private-key contents. Then follow guide B11/B12 for the CLI and externalIPs certificates and B13 for bootstrap. Verify olcne-api-server on the operator and olcne-agent on each cluster node.</p>
+<p>Keep the labadmin CLI endpoint and directory consistent: ocne-op.lab.test:8091 and /home/labadmin/.olcne/certificates/ocne-op.lab.test:8091/. Keep the externalIPs certificate path consistent with module creation.</p>
+<h2 id="recovery-helpers-are-historical">Recovery helpers are historical</h2>
+<p>Authorize-Certificate-Copy.sh and Remove-Certificate-Copy-Key.sh embed this run's public key. Stop-Stalled-Certificate-Copy.sh and <strong>Inspect-Certificate-Transports.sh</strong> contain historical process IDs and can send SIGTERM. The latter is not read-only despite its name. Do not rerun them against today's process table.</p>
+<p>Review a new incident and match the full current process identity before any termination; never kill by a recorded PID alone. Preserve evidence and remove temporary access even if a later stage fails.</p>
+<p>Certificate renewal/rotation and restoration from backup were not exercised in this installation. Follow the cited Oracle lifecycle guidance for that separate operation, preserving the current trust chain until a reviewed replacement procedure is ready.</p>
+<p>Actual results: <a href="CLONING-RUN-LOG.md">cloning log</a>. Execution contexts: <a href="SCRIPT-REFERENCE.md">script reference</a>.</p>
+<h3 id="1b15-foundation-completion-gate">1b.15 Foundation completion gate</h3>
+<p>On ocne-cp: all three nodes Ready, intended system deployments available, active system pods Ready. On each worker: dedicated XFS /var/lib/containers mounted. On operator: /srv/nfs mounted before nfs-server exports. All four nodes must read each other's NFS test files with labadmin UID/GID 1001. Confirm unique machine IDs/host keys, working workstation SSH and synchronized clocks.</p>
+<p>The manual NFS section accesses files locally on the server; the completed lab also mounted its own export at /mnt/ocne-share for a uniform path. To reproduce that optional convenience, use the same client mount/fstab commands on the operator <strong>after</strong> /srv/nfs and nfs-server are healthy. This remains host NFS, not a Kubernetes PV or ASM disk.</p>
+<p>Do not proceed to chapter 2 with failed foundational checks. See the <a href="TROUBLESHOOTING.md">actual foundation troubleshooting table</a> and chapter 4's consolidated incident catalogue.</p>
+<p><a href="MANUAL-02-DATABASE-OPERATOR.html">Continue to 2. Database Operator</a></p>
+<h2 id="attribution-and-license">Attribution and license</h2>
+<p>NFS addition: <strong>Oracle Linux 9 Managing the Network File System</strong>, G26606-03, September 2025, <strong>Copyright © 2025, Oracle and/or its affiliates.</strong> Its <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/nfs/index.html">title and license page</a> specifies CC-BY-SA. XFS and filesystem instructions are attributed to the Oracle Linux 9 manuals linked as N3 and N4. Changes in Part D include lab addresses, paths, a dedicated disk, read/write NFSv4.1 mounts, and local safety/verification wrappers.</p>
+<p>Oracle source manuals: <strong>Oracle Cloud Native Environment Installation for Release 1.9</strong>, F93849-05, March 2026; and <strong>Oracle Cloud Native Environment Kubernetes Module for Release 1.9</strong>, F93851-02, March 2026. <strong>Copyright © 2022, 2026, Oracle and/or its affiliates.</strong></p>
+<p>Their Prefaces identify the documentation license as <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution–ShareAlike 4.0</a>. See the <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/install/preface.html">Installation Preface</a> and <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/kubernetes/preface.html">Kubernetes Preface</a>.</p>
+<p>This adapted guide is provided under the same CC BY-SA 4.0 license. Changes include selecting documented branches, organizing a step-by-step lab workflow, substituting lab identities and certificate paths, and adding the explicitly separate Windows/VirtualBox implementation. It is not an Oracle-authored or Oracle-endorsed guide. Oracle source links are provided throughout.</p>
+</main></body></html>

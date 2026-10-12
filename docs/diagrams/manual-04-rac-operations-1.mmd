@@ -1,0 +1,13 @@
+flowchart TD
+ R["RacDatabase rac19c\nOperator desired configuration"] --> S["StatefulSet racnode1\nreplicas: 1"]
+ S --> P["Pod racnode1-0\noriginal UID"]
+ P -->|"one normal deletion during maintenance"| D["Original pod terminates"]
+ D --> C["StatefulSet observes missing replica"]
+ C --> N["New racnode1-0\nnew UID, reused name"]
+ N --> V["Verify correct worker and mounts\nCRS / ASM / SQL / application service"]
+ V --> Q{"All checks pass?"}
+ Q -->|"yes"| H["Recovery accepted"]
+ Q -->|"no"| A["Preserve survivor
+Inspect logs, mounts and labels
+Apply documented assisted recovery"]
+ A --> V

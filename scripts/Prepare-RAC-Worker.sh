@@ -21,17 +21,17 @@ cp -a /etc/sysconfig/kubelet /etc/default/grub "$backup/"
 grubby --info=ALL > "$backup/grubby-before.txt"
 sysctl fs.file-max net.core.rmem_default net.core.rmem_max net.core.wmem_default net.core.wmem_max fs.aio-max-nr vm.nr_hugepages > "$backup/sysctl-before.txt"
 cat > /etc/sysctl.d/98-ocne-rac.conf <<'SYSCTL'
-# Oracle RAC on OCNE kernel prerequisites; HugePages sized for this lab.
+# Oracle RAC on OCNE kernel prerequisites; HugePages disabled by user request.
 fs.file-max = 6815744
 net.core.rmem_default = 262144
 net.core.rmem_max = 4194304
 net.core.wmem_default = 262144
 net.core.wmem_max = 1048576
 fs.aio-max-nr = 1048576
-vm.nr_hugepages = 1536
+vm.nr_hugepages = 0
 SYSCTL
 sysctl -p /etc/sysctl.d/98-ocne-rac.conf
-[[ $(sysctl -n vm.nr_hugepages) == 1536 ]]
+[[ $(sysctl -n vm.nr_hugepages) == 0 ]]
 # Oracle recommends disabling THP; use grubby for OL9 boot entries.
 grubby --update-kernel=ALL --args='transparent_hugepage=never'
 printf 'never\n' > /sys/kernel/mm/transparent_hugepage/enabled

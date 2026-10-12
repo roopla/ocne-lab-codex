@@ -6,6 +6,7 @@ for pod in rac-netcheck-w1 rac-netcheck-w2; do
  existing=$(kubectl -n rac get pod "$pod" --ignore-not-found -o name)
  [[ -z "$existing" ]] || { echo 'A test pod already exists; inspect it.'; exit 1; }
 done
+[[ -z $(kubectl -n rac get racdatabases -o name) ]] || { echo 'Run this capacity test before RAC provisioning.'; exit 1; }
 manifest=$(mktemp)
 trap 'rm -f "$manifest"' EXIT
 cat > "$manifest" <<'PODS'
@@ -36,30 +37,21 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
-    volumeMounts:
-    - name: hugepages
-      mountPath: /hugepages
   nodeSelector:
     kubernetes.io/hostname: ocne-w1.lab.test
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '3221225472'
+      value: '8589934592'
     - name: kernel.shmall
-      value: '786432'
+      value: '2097152'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
       value: '2'
-  volumes:
-  - name: hugepages
-    emptyDir:
-      medium: HugePages
 ---
 apiVersion: v1
 kind: Pod
@@ -88,30 +80,21 @@ spec:
       requests:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
       limits:
         cpu: '4'
         memory: 16Gi
-        hugepages-2Mi: 3Gi
-    volumeMounts:
-    - name: hugepages
-      mountPath: /hugepages
   nodeSelector:
     kubernetes.io/hostname: ocne-w2.lab.test
   securityContext:
     sysctls:
     - name: kernel.shmmax
-      value: '3221225472'
+      value: '8589934592'
     - name: kernel.shmall
-      value: '786432'
+      value: '2097152'
     - name: kernel.sem
       value: 250 32000 100 128
     - name: net.ipv4.conf.all.rp_filter
       value: '2'
-  volumes:
-  - name: hugepages
-    emptyDir:
-      medium: HugePages
 PODS
 kubectl create --dry-run=server -f "$manifest"
 kubectl create -f "$manifest"
@@ -119,8 +102,7 @@ kubectl wait --for=condition=Ready pod/rac-netcheck-w1 pod/rac-netcheck-w2 -n ra
 for i in 1 2; do
  pod=rac-netcheck-w$i
  if [[ $i == 1 ]]; then own=128; peer=129; else own=129; peer=128; fi
- kubectl exec -n rac "$pod" -- cat /proc/mounts | grep -E '^[^ ]+ /hugepages hugetlbfs '
- kubectl exec -n rac "$pod" -- sysctl -n kernel.shmmax | grep -Fx 3221225472
+ kubectl exec -n rac "$pod" -- sysctl -n kernel.shmmax | grep -Fx 8589934592
  kubectl exec -n rac "$pod" -- ip -4 address show
  kubectl exec -n rac "$pod" -- ip -4 address show dev ens1 | grep -F "192.168.78.$own/24"
  kubectl exec -n rac "$pod" -- ip -4 address show dev ens2 | grep -F "192.168.79.$own/24"

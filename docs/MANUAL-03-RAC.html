@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>3. Prepare and provision the RAC database</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: b1887d8aba5cf10ae015e2a325ef51fcbd15e652da9db8297c08e1042fef04fa; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="MANUAL-03-RAC.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="3-prepare-and-provision-the-rac-database">3. Prepare and provision the RAC database</h1>
+<p><a href="OCNE-RAC-END-TO-END-MANUAL.html">Manual start</a> | Previous: <a href="MANUAL-02-DATABASE-OPERATOR.html">2. Operator</a> | Next: <a href="MANUAL-04-RAC-OPERATIONS.html">4. Operations</a></p>
+<p>This chapter creates a <strong>new two-instance RAC database</strong>. Do not run disk preparation or kubectl create against the completed lab. The corrected fresh-build YAML appears in full below. Every local disk identifier must be discovered on your own build.</p>
+<h2 id="3a-prerequisites-to-provision-rac">3a. Prerequisites to provision RAC</h2>
+<h3 id="3a1-inventory-the-resources-and-data-paths">3a.1 Inventory the resources and data paths</h3>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Worker 1</th>
+<th>Worker 2</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Worker VM</td>
+<td>ocne-w1.lab.test, .77.12</td>
+<td>ocne-w2.lab.test, .77.13</td>
+<td>22 GiB RAM, 6 vCPU each</td>
+</tr>
+<tr>
+<td>RAC pod</td>
+<td>racnode1-0</td>
+<td>racnode2-0</td>
+<td>16 GiB ordinary memory / 4 CPU each</td>
+</tr>
+<tr>
+<td>Database instance</td>
+<td>RACCDB1</td>
+<td>RACCDB2</td>
+<td>SGA 3 GiB / PGA target 2 GiB each</td>
+</tr>
+<tr>
+<td>Private parent NICs</td>
+<td>enp0s8, enp0s9</td>
+<td>enp0s8, enp0s9</td>
+<td>Unnumbered host interfaces; inspect real names</td>
+</tr>
+<tr>
+<td>Pod private IPs</td>
+<td>.78.120 / .79.120</td>
+<td>.78.121 / .79.121</td>
+<td>Cluster interconnects</td>
+</tr>
+<tr>
+<td>Local scratch</td>
+<td>Independent 128 GiB XFS</td>
+<td>Independent 128 GiB XFS</td>
+<td>/scratch, Oracle homes and media</td>
+</tr>
+<tr>
+<td>Shared ASM</td>
+<td>Same two 50 GiB fixed VDIs</td>
+<td>Same two UUIDs, not copies</td>
+<td>DATA disk group, EXTERNAL redundancy</td>
+</tr>
+<tr>
+<td>Node listener</td>
+<td>192.168.77.12:31522</td>
+<td>192.168.77.13:31523</td>
+<td>Service labpdb_app</td>
+</tr>
+<tr>
+<td>Scan listener</td>
+<td>racnode-scan-lsnr, NodePort 31521</td>
+<td>Same Kubernetes service</td>
+<td>Inspect endpoints; currently targets node1</td>
+</tr>
+</tbody>
+</table>
+<img class="diagram" src="diagrams/manual-03-rac-1.svg" alt="MANUAL-03-RAC diagram 1"><details><summary>Mermaid diagram source</summary><pre><code class="language-mermaid">flowchart LR
+ Y[&quot;RacDatabase YAML&quot;] --&gt; O[&quot;Database Operator&quot;]
+ O --&gt; T1[&quot;StatefulSet racnode1&quot;]
+ O --&gt; T2[&quot;StatefulSet racnode2&quot;]
+ T1 --&gt; P1[&quot;racnode1-0: GI + RACCDB1&quot;]
+ T2 --&gt; P2[&quot;racnode2-0: GI + RACCDB2&quot;]
+ H1[(&quot;worker1 /scratch: homes + staging&quot;)] --&gt; P1
+ H2[(&quot;worker2 /scratch: homes + staging&quot;)] --&gt; P2
+ P1 &lt;--&gt; A[(&quot;Shared ASM DATA: RACCDB + LABPDB&quot;)]
+ P2 &lt;--&gt; A
+ P1 &lt;--&gt;|&quot;ens1 / ens2: Multus macvlan&quot;| P2
+ C[&quot;SQL client&quot;] --&gt; L[&quot;NodePort listener: labpdb_app&quot;]
+ L --&gt; P1
+ L --&gt; P2
+</code></pre></details>
+<p>The 16 GiB limit includes ordinary-memory SGA, PGA, GI and other processes. A PGA target is not a hard memory cap. EXTERNAL redundancy has no ASM mirroring; hostPath homes tie recovery to actual worker storage. NFS is separate.</p>
+<h3 id="3a2-shut-down-workers-cleanly-and-add-hardware">3a.2 Shut down workers cleanly and add hardware</h3>
+<p><strong>Before RAC exists</strong>, run sudo shutdown -h now on each worker. Confirm both powered off. Inspect all attachments and NICs. This example uses free SATA3 for scratch, SATA4/5 for ASM and NIC2/3 for private networks. Do not detach existing disks.</p>
+<p><strong>Windows PowerShell, project root; new paths only:</strong></p>
+<pre><code class="language-powershell">$VBox = Join-Path $env:ProgramFiles 'Oracle\VirtualBox\VBoxManage.exe'
+function Invoke-VBoxChecked {
+    &amp; $VBox @args
+    if ($LASTEXITCODE -ne 0) { throw &quot;VBox command failed: $args&quot; }
+}
+foreach ($Node in @('ocne-w1','ocne-w2')) {
+    $Info = &amp; $VBox showvminfo $Node --machinereadable
+    if ($LASTEXITCODE -ne 0 -or $Info -notcontains 'VMState=&quot;poweroff&quot;') { throw &quot;$Node must be powered off&quot; }
+    $Info | Select-String 'SATA|nic[123]|intnet|macaddress|VMState'
+}
+$Confirmed = Read-Host 'Type FREE after verifying SATA3/4/5 and NIC2/3 are unused on both workers'
+if ($Confirmed -cne 'FREE') { throw 'Attachment inventory not confirmed' }
+$Shared = 'D:\OCNE19-Lab\vms\rac-shared'
+New-Item -ItemType Directory -Force $Shared | Out-Null
+$Scratch1 = 'D:\OCNE19-Lab\vms\ocne-w1\rac-scratch.vdi'
+$Scratch2 = 'D:\OCNE19-Lab\vms\ocne-w2\rac-scratch.vdi'
+$Asm1 = Join-Path $Shared 'asm01.vdi'
+$Asm2 = Join-Path $Shared 'asm02.vdi'
+foreach ($Path in @($Scratch1,$Scratch2,$Asm1,$Asm2)) {
+    if (Test-Path -LiteralPath $Path) { throw &quot;Existing disk: $Path. Inspect; do not overwrite.&quot; }
+}
+foreach ($Path in @($Scratch1,$Scratch2)) {
+    Invoke-VBoxChecked createmedium disk --filename $Path --size 131072 --format VDI --variant Standard
+}
+foreach ($Path in @($Asm1,$Asm2)) {
+    Invoke-VBoxChecked createmedium disk --filename $Path --size 51200 --format VDI --variant Fixed
+    Invoke-VBoxChecked modifymedium disk $Path --type shareable
+    Invoke-VBoxChecked showmediuminfo disk $Path
+}
+Invoke-VBoxChecked storageattach ocne-w1 --storagectl SATA --port 3 --device 0 --type hdd --medium $Scratch1
+Invoke-VBoxChecked storageattach ocne-w2 --storagectl SATA --port 3 --device 0 --type hdd --medium $Scratch2
+foreach ($Node in @('ocne-w1','ocne-w2')) {
+    Invoke-VBoxChecked storageattach $Node --storagectl SATA --port 4 --device 0 --type hdd --medium $Asm1
+    Invoke-VBoxChecked storageattach $Node --storagectl SATA --port 5 --device 0 --type hdd --medium $Asm2
+    Invoke-VBoxChecked modifyvm $Node --nic2 intnet --intnet2 ocne-rac-priv1 --nictype2 82540EM --nicpromisc2 allow-vms --cableconnected2 on --nic3 intnet --intnet3 ocne-rac-priv2 --nictype3 82540EM --nicpromisc3 allow-vms --cableconnected3 on
+    Invoke-VBoxChecked showvminfo $Node --machinereadable
+}
+</code></pre>
+<p>Review before startvm. Both worker ASM01 attachments must resolve to the <strong>same</strong> UUID, as must ASM02. showmediuminfo7.2 does not accept --machinereadable. Ordinary snapshots do not coordinate shared-disk backup.</p>
+<p>Equivalent <strong>Windows Git Bash</strong>, an alternative to PowerShell, never an additional run:</p>
+<pre><code class="language-bash">set -euo pipefail
+VBOX='/c/Program Files/Oracle/VirtualBox/VBoxManage.exe'
+for node in ocne-w1 ocne-w2; do
+  &quot;$VBOX&quot; showvminfo &quot;$node&quot; --machinereadable
+  &quot;$VBOX&quot; showvminfo &quot;$node&quot; --machinereadable | grep -Fx 'VMState=&quot;poweroff&quot;'
+done
+read -r -p 'Type FREE after checking SATA3/4/5 and NIC2/3 are unused on both VMs: ' answer
+test &quot;$answer&quot; = FREE
+mkdir -p /d/OCNE19-Lab/vms/rac-shared
+for node in ocne-w1 ocne-w2; do test ! -e &quot;/d/OCNE19-Lab/vms/$node/rac-scratch.vdi&quot;; done
+for n in 1 2; do test ! -e &quot;/d/OCNE19-Lab/vms/rac-shared/asm0$n.vdi&quot;; done
+for node in ocne-w1 ocne-w2; do
+  &quot;$VBOX&quot; createmedium disk --filename &quot;D:/OCNE19-Lab/vms/$node/rac-scratch.vdi&quot; --size 131072 --format VDI --variant Standard
+  &quot;$VBOX&quot; storageattach &quot;$node&quot; --storagectl SATA --port 3 --device 0 --type hdd --medium &quot;D:/OCNE19-Lab/vms/$node/rac-scratch.vdi&quot;
+done
+for n in 1 2; do
+  disk=&quot;D:/OCNE19-Lab/vms/rac-shared/asm0$n.vdi&quot;
+  &quot;$VBOX&quot; createmedium disk --filename &quot;$disk&quot; --size 51200 --format VDI --variant Fixed
+  &quot;$VBOX&quot; modifymedium disk &quot;$disk&quot; --type shareable
+  &quot;$VBOX&quot; showmediuminfo disk &quot;$disk&quot;
+  for node in ocne-w1 ocne-w2; do
+    &quot;$VBOX&quot; storageattach &quot;$node&quot; --storagectl SATA --port &quot;$((n+3))&quot; --device 0 --type hdd --medium &quot;$disk&quot;
+  done
+done
+for node in ocne-w1 ocne-w2; do
+  &quot;$VBOX&quot; modifyvm &quot;$node&quot; --nic2 intnet --intnet2 ocne-rac-priv1 --nictype2 82540EM --nicpromisc2 allow-vms --cableconnected2 on --nic3 intnet --intnet3 ocne-rac-priv2 --nictype3 82540EM --nicpromisc3 allow-vms --cableconnected3 on
+  &quot;$VBOX&quot; showvminfo &quot;$node&quot; --machinereadable
+done
+</code></pre>
+<h3 id="3a3-map-every-new-disk-before-initializing-it">3a.3 Map every new disk before initializing it</h3>
+<p>Start workers after reviewing hardware. On <strong>each worker as root</strong>:</p>
+<pre><code class="language-bash">lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,SERIAL,UUID,PARTUUID
+findmnt
+ls -l /dev/disk/by-id/
+ip -br link
+</code></pre>
+<p>Match VBox path/UUID/slot to Linux serial, size and device. Device letters changed on worker2 in this run. A50GiB disk is not automatically ASM01. Inspect each candidate with wipefs --no-act, child partitions, mounts and /sys/class/block/DEVICE/holders. Failed inspection is not proof of blankness. Preserve unrelated disks.</p>
+<h3 id="3a4-create-scratch-once-per-worker">3a.4 Create scratch once per worker</h3>
+<p><strong>Root on each worker, new blank scratch disk only.</strong> This parameterized form retains the executed helper's checks but uses <strong>your</strong> verified serial.</p>
+<pre><code class="language-bash">#!/bin/bash
+# One-time local provisioning using the inspected new scratch-disk serials.
+# XFS/mount procedure: Oracle Linux filesystem sources cited in guide Part D.
+set -euo pipefail
+[[ $(id -u) == 0 ]]
+case $(hostname -s) in ocne-w1|ocne-w2) ;; *) exit 1;; esac
+read -r -p 'Verified NEW 128 GiB scratch disk serial: ' serial
+[[ -n &quot;$serial&quot; ]]
+label=rac-scratch
+mapfile -t matches &lt; &lt;(lsblk -dnpo NAME,SERIAL | awk -v serial=&quot;$serial&quot; '$2==serial {print $1}')
+[[ ${#matches[@]} == 1 ]] || { echo 'Expected exactly one scratch serial'; exit 1; }
+disk=${matches[0]}
+[[ $(blockdev --getsize64 &quot;$disk&quot;) == 137438953472 ]]
+[[ $(lsblk -dnro TYPE &quot;$disk&quot;) == disk ]]
+[[ $(lsblk -nrpo NAME &quot;$disk&quot; | wc -l) == 1 ]]
+[[ -z $(lsblk -nrpo MOUNTPOINTS &quot;$disk&quot;) ]]
+signatures=$(wipefs --no-act --noheadings --output TYPE &quot;$disk&quot;)
+[[ -z &quot;$signatures&quot; ]]
+[[ -z $(ls -A &quot;/sys/class/block/${disk##*/}/holders&quot;) ]]
+! findmnt -rn -S &quot;$disk&quot; &gt;/dev/null
+! mountpoint -q /scratch
+! awk '$1 !~ /^#/ &amp;&amp; $2==&quot;/scratch&quot; {found=1} END {exit !found}' /etc/fstab
+[[ ! -e /scratch || ( -d /scratch &amp;&amp; -z $(ls -A /scratch) ) ]]
+printf 'Identified blank scratch device: %s serial=%s\n' &quot;$disk&quot; &quot;$serial&quot;
+lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,SERIAL &quot;$disk&quot;
+mkfs.xfs -L &quot;$label&quot; &quot;$disk&quot;
+uuid=$(blkid -s UUID -o value &quot;$disk&quot;)
+[[ $uuid =~ ^[0-9a-f-]{36}$ &amp;&amp; $(blkid -s TYPE -o value &quot;$disk&quot;) == xfs ]]
+cp -a /etc/fstab &quot;/etc/fstab.before-rac-scratch-$(date +%Y%m%d%H%M%S)&quot;
+mkdir -p /scratch
+printf 'UUID=%s /scratch xfs defaults 0 0\n' &quot;$uuid&quot; &gt;&gt; /etc/fstab
+systemctl daemon-reload
+mount /scratch
+[[ $(findmnt -nro UUID -M /scratch) == &quot;$uuid&quot; ]]
+[[ $(findmnt -nro FSTYPE -M /scratch) == xfs ]]
+findmnt -n -o SOURCE,UUID,FSTYPE,TARGET -M /scratch
+df -h /scratch
+printf 'Scratch mounted; ASM disks and existing root/container filesystems were not modified.\n'
+</code></pre>
+<p>Expected: XFS /scratch with a new recorded UUID, existing filesystems unchanged. An existing signature/mount is a stop condition, not a reason to force mkfs.</p>
+<h3 id="3a5-partition-shared-asm-disks-on-worker1-only">3a.5 Partition shared ASM disks on worker1 only</h3>
+<p><strong>Root on worker1, blank shared disks only.</strong> Do not partition them again on worker2. No mkfs is used on ASM.</p>
+<pre><code class="language-bash">#!/bin/bash
+# One-time GPT labels for two inspected blank shared ASM disks, on worker1 only.
+# No filesystem or ASM disk group is created here.
+# https://docs.oracle.com/en/operating-systems/oracle-linux/9/stordev/stordev-UsingDiskPartitions.html
+set -euo pipefail
+[[ $(id -u) == 0 &amp;&amp; $(hostname -s) == ocne-w1 ]]
+read -r -p 'Verified blank ASM01 disk serial: ' serial1
+read -r -p 'Verified blank ASM02 disk serial: ' serial2
+[[ -n $serial1 &amp;&amp; -n $serial2 &amp;&amp; $serial1 != &quot;$serial2&quot; ]]
+serials=(&quot;$serial1&quot; &quot;$serial2&quot;)
+names=(ocne-rac-asm01 ocne-rac-asm02)
+disks=()
+for i in 0 1; do
+ serial=${serials[$i]}
+ mapfile -t matches &lt; &lt;(lsblk -dnpo NAME,SERIAL | awk -v serial=&quot;$serial&quot; '$2==serial {print $1}')
+ [[ ${#matches[@]} == 1 ]]
+ disk=${matches[0]}
+ [[ $(blockdev --getsize64 &quot;$disk&quot;) == 53687091200 ]]
+ [[ $(lsblk -nrpo NAME &quot;$disk&quot; | wc -l) == 1 ]]
+ mounts=$(lsblk -nrpo MOUNTPOINTS &quot;$disk&quot;)
+ [[ -z &quot;$mounts&quot; ]]
+ signatures=$(wipefs --no-act --noheadings --output TYPE &quot;$disk&quot;)
+ [[ -z &quot;$signatures&quot; ]]
+ [[ -z $(ls -A &quot;/sys/class/block/${disk##*/}/holders&quot;) ]]
+ [[ ! -e /dev/disk/by-partlabel/${names[$i]} ]]
+ disks+=(&quot;$disk&quot;)
+ printf 'Verified blank 50 GiB ASM disk: %s %s\n' &quot;$disk&quot; &quot;$serial&quot;
+done
+for i in 0 1; do
+ disk=${disks[$i]}
+ name=${names[$i]}
+ parted -s -a optimal &quot;$disk&quot; mklabel gpt mkpart &quot;$name&quot; 1MiB 100%
+ partprobe &quot;$disk&quot;
+ udevadm settle
+ partition=/dev/disk/by-partlabel/$name
+ [[ -b $partition ]]
+ [[ $(lsblk -nro PKNAME &quot;$partition&quot;) == &quot;${disk##*/}&quot; ]]
+ signatures=$(wipefs --no-act --noheadings --output TYPE &quot;$partition&quot;)
+ [[ -z &quot;$signatures&quot; ]]
+ lsblk -b -o NAME,SIZE,TYPE,FSTYPE,PARTLABEL,PARTUUID,SERIAL &quot;$disk&quot;
+done
+</code></pre>
+<p>On <strong>both workers</strong>, refresh and compare PARTUUIDs and attachments:</p>
+<pre><code class="language-bash">sudo partprobe
+sudo udevadm settle
+for label in ocne-rac-asm01 ocne-rac-asm02; do
+  path=/dev/disk/by-partlabel/$label
+  test -b &quot;$path&quot; || break
+  lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,PARTLABEL,PARTUUID,SERIAL &quot;$path&quot;
+  sudo blkid -s PARTUUID -o value &quot;$path&quot;
+  sudo wipefs --no-act &quot;$path&quot;
+done
+</code></pre>
+<p>Before provisioning: no filesystem/ASM signature or mount. After provisioning these partitions intentionally contain ASM data: <strong>never remove those signatures or repeat preparation</strong>. The operator creates block PV/PVC objects later; do not precreate an NFS PVC or run ASMCA.</p>
+<h3 id="3a6-configure-private-nics-on-each-worker">3a.6 Configure private NICs on each worker</h3>
+<p>Match VBox MACs to ip -br link. Verify enp0s8/enp0s9 are the internal-network adapters, not SSH/public NIC1. <strong>Root on each worker</strong>, new profiles only:</p>
+<pre><code class="language-bash">nmcli connection show
+nmcli connection add type ethernet ifname enp0s8 con-name ocne-rac-private1 ipv4.method disabled ipv6.method disabled ethernet.mtu 1500 connection.autoconnect yes
+nmcli connection add type ethernet ifname enp0s9 con-name ocne-rac-private2 ipv4.method disabled ipv6.method disabled ethernet.mtu 1500 connection.autoconnect yes
+nmcli connection modify ocne-rac-private1 802-3-ethernet.accept-all-mac-addresses 1
+nmcli connection modify ocne-rac-private2 802-3-ethernet.accept-all-mac-addresses 1
+nmcli connection up ocne-rac-private1
+nmcli connection up ocne-rac-private2
+ip -d link show enp0s8
+ip -d link show enp0s9
+ip -4 address show
+ip -6 address show
+ip route
+</code></pre>
+<p>Expected: private parents UP/PROMISC without host IP/default route, NIC1 unchanged. VirtualBox allow-vms alone was insufficient: guest accept-all-mac-addresses fixed unicast reception. For an already-active profile persist it and use <code>ip link set dev enp0s8 promisc on</code> (and enp0s9) for the current activation; this NetworkManager could not reapply the property in place.</p>
+<h3 id="3a7-install-ocne-multus-and-network-definitions">3a.7 Install OCNE Multus and network definitions</h3>
+<p><strong>ocne-op as labadmin</strong>, following <a href="https://docs.oracle.com/en/operating-systems/olcne/1.9/multus/install.html">OCNE1.9 Multus</a>:</p>
+<pre><code class="language-bash">olcnectl module instances --environment-name homelab
+# Only when rac-multus is absent:
+olcnectl module create --environment-name homelab --module multus --name rac-multus --multus-kubernetes-module cluster1
+olcnectl module install --environment-name homelab --name rac-multus
+olcnectl module report --environment-name homelab --name rac-multus --children
+</code></pre>
+<p>On <strong>ocne-cp</strong>, save this complete content as ~/ocne-rac-prereqs/rac-networks.yaml, or copy the project file. Review parent names, namespace and ranges:</p>
+<pre><code class="language-yaml"># Local network values; Oracle RAC MACVLAN model and OCNE 1.9 Multus module.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rac
+  labels:
+    app.kubernetes.io/part-of: ocne19-lab
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf1
+  namespace: rac
+spec:
+  config: &gt;-
+    {&quot;cniVersion&quot;:&quot;0.3.1&quot;,&quot;type&quot;:&quot;macvlan&quot;,&quot;master&quot;:&quot;enp0s8&quot;,&quot;mode&quot;:&quot;bridge&quot;,&quot;mtu&quot;:1500,&quot;ipam&quot;:{&quot;type&quot;:&quot;host-local&quot;,&quot;subnet&quot;:&quot;192.168.78.0/24&quot;,&quot;rangeStart&quot;:&quot;192.168.78.120&quot;,&quot;rangeEnd&quot;:&quot;192.168.78.130&quot;}}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf2
+  namespace: rac
+spec:
+  config: &gt;-
+    {&quot;cniVersion&quot;:&quot;0.3.1&quot;,&quot;type&quot;:&quot;macvlan&quot;,&quot;master&quot;:&quot;enp0s9&quot;,&quot;mode&quot;:&quot;bridge&quot;,&quot;mtu&quot;:1500,&quot;ipam&quot;:{&quot;type&quot;:&quot;host-local&quot;,&quot;subnet&quot;:&quot;192.168.79.0/24&quot;,&quot;rangeStart&quot;:&quot;192.168.79.120&quot;,&quot;rangeEnd&quot;:&quot;192.168.79.130&quot;}}
+</code></pre>
+<p>Apply and verify:</p>
+<pre><code class="language-bash">kubectl apply -f ~/ocne-rac-prereqs/rac-networks.yaml
+kubectl rollout status daemonset/kube-multus-ds -n kube-system --timeout=240s
+kubectl get daemonset kube-multus-ds -n kube-system
+kubectl get network-attachment-definitions -n rac
+kubectl get network-attachment-definition macvlan-conf1 -n rac -o yaml
+kubectl get network-attachment-definition macvlan-conf2 -n rac -o yaml
+</code></pre>
+<p>Expected: Multus3/3 Ready, both NADs present. Host-local IPAM is per-worker, not a cluster-wide allocator. Dedicate these NADs/ranges to this RAC cluster and verify operator-assigned explicit addresses.</p>
+<h3 id="3a8-prepare-worker-os-limits-thp-and-selinux">3a.8 Prepare worker OS limits, THP and SELinux</h3>
+<p><strong>Root on each worker, before RAC exists.</strong> Inspect and retain existing kubelet arguments. Install policy tools and create staging before labeling it:</p>
+<pre><code class="language-bash">dnf install -y selinux-policy-devel policycoreutils-python-utils make
+install -d -m 0755 /scratch/software/stage
+findmnt -M /scratch -o SOURCE,UUID,FSTYPE,TARGET
+cat /etc/sysconfig/kubelet
+getenforce
+cat /proc/swaps
+cat /sys/devices/system/clocksource/clocksource0/current_clocksource
+</code></pre>
+<p>The next block accepts your scratch UUID, retains existing kubelet options, and includes the complete Oracle SELinux policy. vm.nr_hugepages=0 is the owner's explicit lab choice; THP remains disabled. These are different memory mechanisms. No enforcement/firewall disable is used.</p>
+<pre><code class="language-bash">#!/bin/bash
+# Oracle RAC/OCNE prerequisites, locally sized for 22 GiB workers.
+set -euo pipefail
+[[ $(id -u) == 0 &amp;&amp; $(getenforce) == Enforcing ]]
+read -r -p 'Recorded XFS UUID for this worker scratch disk: ' uuid
+[[ -n $uuid ]]
+[[ $(findmnt -nro UUID -M /scratch) == &quot;$uuid&quot; ]]
+[[ $(wc -l &lt; /proc/swaps) == 1 ]]
+[[ $(cat /sys/devices/system/clocksource/clocksource0/current_clocksource) == tsc ]]
+for path in /etc/sysctl.d/98-ocne-rac.conf /var/opt/rac-ocne.te /scratch/rac/cluster01; do
+ [[ ! -e $path ]] || { echo &quot;Existing prerequisite asset: $path; inspect before continuing.&quot;; exit 1; }
+done
+cat /etc/sysconfig/kubelet
+rpm -q selinux-policy-devel policycoreutils-python-utils
+backup=/var/opt/ocne-rac-backup-$(date -u +%Y%m%dT%H%M%SZ)
+install -d -m 0700 &quot;$backup&quot;
+cp -a /etc/sysconfig/kubelet /etc/default/grub &quot;$backup/&quot;
+grubby --info=ALL &gt; &quot;$backup/grubby-before.txt&quot;
+sysctl fs.file-max net.core.rmem_default net.core.rmem_max net.core.wmem_default net.core.wmem_max fs.aio-max-nr vm.nr_hugepages &gt; &quot;$backup/sysctl-before.txt&quot;
+cat &gt; /etc/sysctl.d/98-ocne-rac.conf &lt;&lt;'SYSCTL'
+# Oracle RAC on OCNE kernel prerequisites; HugePages disabled by user request.
+fs.file-max = 6815744
+net.core.rmem_default = 262144
+net.core.rmem_max = 4194304
+net.core.wmem_default = 262144
+net.core.wmem_max = 1048576
+fs.aio-max-nr = 1048576
+vm.nr_hugepages = 0
+SYSCTL
+sysctl -p /etc/sysctl.d/98-ocne-rac.conf
+[[ $(sysctl -n vm.nr_hugepages) == 0 ]]
+# Oracle recommends disabling THP; use grubby for OL9 boot entries.
+grubby --update-kernel=ALL --args='transparent_hugepage=never'
+printf 'never\n' &gt; /sys/kernel/mm/transparent_hugepage/enabled
+python3 &lt;&lt;'KUBELET'
+from pathlib import Path
+import re
+p=Path('/etc/sysconfig/kubelet'); text=p.read_text()
+matches=list(re.finditer(r'^KUBELET_EXTRA_ARGS=&quot;([^&quot;\n]*)&quot;$',text,re.M))
+assert len(matches)==1, 'Inspect kubelet file format before editing'
+m=matches[0]; current=m.group(1)
+assert '--allowed-unsafe-sysctls' not in current, 'Inspect existing sysctl allowance'
+updated=current+' --allowed-unsafe-sysctls=kernel.shm*,net.*,kernel.sem'
+p.write_text(text[:m.start()]+'KUBELET_EXTRA_ARGS=&quot;'+updated+'&quot;'+text[m.end():])
+KUBELET
+cat &gt; /var/opt/rac-ocne.te &lt;&lt;'POLICY'
+module rac-ocne 1.0;
+require {
+ type kernel_t;
+ class system syslog_read;
+ type container_runtime_t;
+ type container_init_t;
+ type container_file_t;
+ type lib_t;
+ type textrel_shlib_t;
+ type bin_t;
+ class file { getattr execmod execute map setattr };
+}
+allow container_init_t container_runtime_t:file getattr;
+allow container_init_t bin_t:file { map execute };
+allow container_init_t container_file_t:file execmod;
+allow container_init_t lib_t:file execmod;
+allow container_init_t textrel_shlib_t:file setattr;
+allow container_init_t kernel_t:system syslog_read;
+POLICY
+cd /var/opt
+make -f /usr/share/selinux/devel/Makefile rac-ocne.pp
+semodule -i rac-ocne.pp
+for n in 1 2; do install -d -m 0755 -o 54321 -g 54321 /scratch/rac/cluster01/racnode$n; done
+semanage fcontext -a -t container_file_t '/scratch/rac/cluster01(/.*)?'
+semanage fcontext -a -t container_file_t '/scratch/software/stage(/.*)?'
+restorecon -RF /scratch/rac/cluster01 /scratch/software/stage
+systemctl daemon-reload
+systemctl restart kubelet
+systemctl is-active kubelet
+semodule -l | grep '^rac-ocne'
+getent passwd 54321 || true
+ls -Zd /scratch/rac/cluster01/racnode{1,2} /scratch/software/stage
+grep -E 'MemTotal|MemAvailable|HugePages|Hugepagesize' /proc/meminfo
+cat /sys/kernel/mm/transparent_hugepage/enabled
+printf 'RAC worker settings applied; backup: %s\n' &quot;$backup&quot;
+</code></pre>
+<p>If the clocksource is not TSC, stop and consult Oracle's platform prerequisites before changing it; this lab already used TSC. If a file context exists, inspect semanage fcontext -l before updating it.</p>
+<p>Reboot <strong>one worker at a time before provisioning</strong>, recording boot IDs and checking readiness after each. Verify persistence:</p>
+<pre><code class="language-bash">cat /proc/sys/kernel/random/boot_id
+findmnt -M /scratch
+findmnt -M /var/lib/containers
+findmnt -M /mnt/ocne-share
+getenforce
+sysctl vm.nr_hugepages fs.file-max fs.aio-max-nr
+cat /sys/kernel/mm/transparent_hugepage/enabled
+ip -d link show enp0s8
+ip -d link show enp0s9
+sudo semodule -l | grep '^rac-ocne'
+systemctl is-active kubelet crio chronyd firewalld
+chronyc tracking
+</code></pre>
+<p>Expected: recorded mounts, Enforcing, HugePages0, THP[never], private NICs PROMISC, services active and time synchronized. On ocne-cp wait for each node Ready. Repeat an NFS write/read as labadmin.</p>
+<h3 id="3a9-test-networking-and-scheduling-before-rac">3a.9 Test networking and scheduling before RAC</h3>
+<p>Copy config/rac-network-check.yaml from the workstation to ocne-cp:~/ocne-rac-prereqs/. It contains two disposable pods, private .128/.129 addresses, and 4 CPU/16GiB requests. Review names and subnets. Run only when no RAC CR or existing diagnostic pods exist.</p>
+<p><strong>ocne-cp as labadmin:</strong></p>
+<pre><code class="language-bash">kubectl get racdatabases -n rac
+kubectl get pods -n rac
+# Continue only after confirming the absence described above.
+kubectl apply -f ~/ocne-rac-prereqs/rac-network-check.yaml
+kubectl wait -n rac --for=condition=Ready pod/rac-netcheck-w1 pod/rac-netcheck-w2 --timeout=180s
+kubectl get pods -n rac -o wide
+kubectl exec -n rac rac-netcheck-w1 -- ip -4 address show
+kubectl exec -n rac rac-netcheck-w2 -- ip -4 address show
+kubectl exec -n rac rac-netcheck-w1 -- ping -c 3 -s 1472 -I ens1 192.168.78.129
+kubectl exec -n rac rac-netcheck-w1 -- ping -c 3 -s 1472 -I ens2 192.168.79.129
+kubectl exec -n rac rac-netcheck-w2 -- ping -c 3 -s 1472 -I ens1 192.168.78.128
+kubectl exec -n rac rac-netcheck-w2 -- ping -c 3 -s 1472 -I ens2 192.168.79.128
+kubectl exec -n rac rac-netcheck-w1 -- nslookup kubernetes.default.svc.cluster.local
+kubectl exec -n rac rac-netcheck-w2 -- nslookup kubernetes.default.svc.cluster.local
+kubectl exec -n rac rac-netcheck-w1 -- sysctl kernel.shmmax kernel.shmall
+kubectl exec -n rac rac-netcheck-w2 -- sysctl kernel.shmmax kernel.shmall
+# After checking results, remove ONLY these diagnostics to release resources:
+kubectl delete pod -n rac rac-netcheck-w1 rac-netcheck-w2
+</code></pre>
+<p>Require bidirectional pings on both networks, working DNS and matching sysctl values. A scheduling failure needs Events inspection; do not shrink below the operator's minimum to force scheduling. The payload checks the1500-byte path, not jumbo MTU or workload capacity. Do not run these large test pods alongside RAC.</p>
+<h3 id="3a10-stage-the-slim-image-in-cri-o">3a.10 Stage the slim image in CRI-O</h3>
+<p>On <strong>each worker</strong>:</p>
+<pre><code class="language-bash">RAC_IMAGE='docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d'
+sudo crictl pull &quot;$RAC_IMAGE&quot;
+sudo crictl images
+sudo crictl inspecti &quot;$RAC_IMAGE&quot;
+</code></pre>
+<p>Require matching digest in CRI-O's configured endpoint. Rootless Podman uses a different store. For private registries use protected authentication, not passwords in arguments. The manifest uses IfNotPresent and the digest.</p>
+<p>The inspected image contract was OL9.8/amd64; oracle54321:54321, grid UID54332/GID54321; systemd, Python3 and /opt/scripts/startup/runOracle.sh. It must implement the operator's setup contract, not merely contain Oracle Linux. Inspect image files without starting installers. <a href="RAC-ARTIFACT-ACCEPTANCE.md">Artifact acceptance</a> records the full checks and source pointers.</p>
+<h3 id="3a11-stage-already-patched-gi-and-database-home-zips">3a.11 Stage already-patched GI and database home ZIPs</h3>
+<p>No deployment-time binary RU/OPatch step is configured. DBCA can still perform SQL dictionary patch actions; those are not binary patch reapplication.</p>
+<p><strong>Root on each worker</strong>, after checking the scratch mount:</p>
+<pre><code class="language-bash">findmnt -M /scratch -o SOURCE,UUID,FSTYPE,TARGET
+sudo install -d -m 0755 -o labadmin -g labadmin /scratch/software/stage/19c/19.32-gold
+sudo restorecon -RF /scratch/software/stage
+</code></pre>
+<p><strong>Windows PowerShell, project root:</strong></p>
+<pre><code class="language-powershell">Get-FileHash .\ISO\oracle-gridhome-19.32.zip -Algorithm SHA256
+Get-FileHash .\ISO\oracle-dbhome-19.32.zip -Algorithm SHA256
+scp .\ISO\oracle-gridhome-19.32.zip .\ISO\oracle-dbhome-19.32.zip ocne-w1:/scratch/software/stage/19c/19.32-gold/
+scp .\ISO\oracle-gridhome-19.32.zip .\ISO\oracle-dbhome-19.32.zip ocne-w2:/scratch/software/stage/19c/19.32-gold/
+</code></pre>
+<p>Equivalent <strong>Git Bash</strong>:</p>
+<pre><code class="language-bash">sha256sum ISO/oracle-gridhome-19.32.zip ISO/oracle-dbhome-19.32.zip
+for node in ocne-w1 ocne-w2; do
+  scp ISO/oracle-gridhome-19.32.zip ISO/oracle-dbhome-19.32.zip &quot;$node:/scratch/software/stage/19c/19.32-gold/&quot;
+done
+</code></pre>
+<p>Inspect existing destinations before overwriting. For new archives check member paths and CRCs before extraction. Save this as a local Python file under private/ and run it from the <strong>project root</strong> with python; it reads without extracting:</p>
+<pre><code class="language-python">from pathlib import Path, PurePosixPath
+from zipfile import ZipFile
+for path in (Path('ISO/oracle-gridhome-19.32.zip'),Path('ISO/oracle-dbhome-19.32.zip')):
+    with ZipFile(path) as archive:
+        for item in archive.infolist():
+            name=item.filename.replace('\\','/')
+            member=PurePosixPath(name)
+            assert not member.is_absolute() and '..' not in member.parts and ':' not in name, name
+        assert archive.testzip() is None, 'CRC failure'
+        print(path.name, len(archive.infolist()), 'members, CRC/path checks passed')
+</code></pre>
+<p>On <strong>both workers</strong>:</p>
+<pre><code class="language-bash">cd /scratch/software/stage/19c/19.32-gold
+sha256sum oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+unzip -tq oracle-gridhome-19.32.zip
+unzip -tq oracle-dbhome-19.32.zip
+sudo chown 54321:54321 oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+sudo chmod 0755 oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+sudo restorecon -RF /scratch/software/stage/19c/19.32-gold
+ls -lZ oracle-gridhome-19.32.zip oracle-dbhome-19.32.zip
+df -h /scratch /var/lib/containers
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Archive</th>
+<th style="text-align: right;">Bytes</th>
+<th>Supplied-file SHA256</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>oracle-gridhome-19.32.zip</td>
+<td style="text-align: right;">5100099678</td>
+<td>d02d04276e767d7715006fa3690851f2203ff578ff35e963e18b67b15ddcc917</td>
+</tr>
+<tr>
+<td>oracle-dbhome-19.32.zip</td>
+<td style="text-align: right;">5142587720</td>
+<td>da75d72a2c1491d129e70ac0c3cdbb86c19024d5d80931f0e9c7714d25ef7e5f</td>
+</tr>
+</tbody>
+</table>
+<p>These fingerprint owner-supplied files; no publisher-checksum verification is claimed. For newly built ZIPs record your own hashes and match both destinations. Verify archive roots expose gridSetup.sh/runInstaller and expected home layout without an extra wrapper directory. Expanded sizes were about11.5/11.7billion bytes, in addition to staging files. The operator extracts homes; do not run the installers yourself in prerequisites.</p>
+<p><strong>OPatch is12.2.0.1.53;19.32 is the RU level.</strong> Live inventories later confirmed RU39472050, OCW39526364, OJVM39222882 and GI components. The owner determined DBCA fix34436514 unnecessary for these homes; this is their applicability decision, not independently established Oracle supersedence. Resolve requirements separately for different homes.</p>
+<h3 id="3a12-validate-each-worker-with-cvu">3a.12 Validate each worker with CVU</h3>
+<p>The supplied cvupack_linux_ol8_x86_64.zip actually identifies OL8/OL9/RHEL8/RHEL9 in its README and reports standalone23.26.3.0.0. Obtain CVU through <a href="https://www.oracle.com/database/technologies/cvu-downloads.html">Oracle</a>; inspect actual README/version/help, not just filename.</p>
+<p><strong>Root on each worker</strong>, with /scratch verified:</p>
+<pre><code class="language-bash">sudo install -d -m 0755 -o labadmin -g labadmin /scratch/tools/cvu-23.26.3
+</code></pre>
+<p>Transfer from workstation (scp works in PowerShell and Git Bash):</p>
+<pre><code class="language-bash">scp ISO/cvupack_linux_ol8_x86_64.zip ocne-w1:/scratch/tools/cvu-23.26.3/
+scp ISO/cvupack_linux_ol8_x86_64.zip ocne-w2:/scratch/tools/cvu-23.26.3/
+</code></pre>
+<p><strong>Each worker as labadmin</strong>, new extraction only:</p>
+<pre><code class="language-bash">set -euo pipefail
+cd /scratch/tools/cvu-23.26.3
+sha256sum cvupack_linux_ol8_x86_64.zip
+unzip -tq cvupack_linux_ol8_x86_64.zip
+test ! -e bin
+unzip -q -n cvupack_linux_ol8_x86_64.zip
+./bin/cluvfy -version
+./bin/cluvfy comp -help
+report=&quot;$HOME/cvu-reports/$(date -u +%Y%m%dT%H%M%SZ)&quot;
+install -d -m 0700 &quot;$report&quot;
+./bin/cluvfy comp containerhost -type k8 -verbose -text -savedir &quot;$report&quot;
+</code></pre>
+<p>Require exit0 and inspect all checks. This component has no -r/-n switch; run locally on both workers without automatic fixups. The package SHA256 was23da73fed4b9403f933a5bbb8e75e9b6931ed5fd33fd1dbfc6503227de70bdc8; no matching publisher checksum was established. Both hosts passed10October <strong>before</strong> HugePages were disabled. That is not a post-change CVU rerun; final runtime SQL/memory checks are separate. Save fresh reports for your build and investigate differences. <a href="RAC-CVU-RESULTS.md">Recorded CVU results</a>.</p>
+<h3 id="3a13-generate-secrets-and-label-workers">3a.13 Generate secrets and label workers</h3>
+<p><strong>ocne-cp as labadmin</strong>, absent secret names only. The24-character password avoids the observed GI INS-30003 limit of30; the original32-character generator failed. Do not print/decode secrets into transcripts. Keep recovery material in the0700 guest directory.</p>
+<pre><code class="language-bash">#!/bin/bash
+# Creates prerequisite secrets only. Never creates a RacDatabase.
+set -euo pipefail
+set +x
+[[ $(hostname -s) == ocne-cp &amp;&amp; $(id -un) == labadmin ]]
+export KUBECONFIG=&quot;$HOME/.kube/config&quot;
+secret_dir=&quot;$HOME/.local/share/ocne-rac-secrets&quot;
+[[ ! -e $secret_dir ]]
+for secret in rac-db-password rac-ssh-key; do
+ existing=$(kubectl get secret -n rac &quot;$secret&quot; --ignore-not-found -o name)
+ [[ -z $existing ]] || { echo &quot;Secret exists: $secret; inspect before continuing.&quot;; exit 1; }
+done
+umask 077
+install -d -m 0700 &quot;$secret_dir&quot;
+python3 - &quot;$secret_dir/db-password.txt&quot; &lt;&lt;'PY'
+import secrets,string,sys
+alphabet=string.ascii_letters+string.digits
+with open(sys.argv[1],'x') as target:
+ target.write('Rac_9' + ''.join(secrets.choice(alphabet) for _ in range(19)))
+PY
+openssl genrsa -out &quot;$secret_dir/key.pem&quot; 3072 2&gt;/dev/null
+openssl rsa -in &quot;$secret_dir/key.pem&quot; -out &quot;$secret_dir/key.pub&quot; -pubout 2&gt;/dev/null
+openssl pkeyutl -encrypt -pubin -inkey &quot;$secret_dir/key.pub&quot; -in &quot;$secret_dir/db-password.txt&quot; -out &quot;$secret_dir/pwdfile.enc&quot; -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256
+openssl pkeyutl -decrypt -inkey &quot;$secret_dir/key.pem&quot; -in &quot;$secret_dir/pwdfile.enc&quot; -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256 | cmp - &quot;$secret_dir/db-password.txt&quot;
+ssh-keygen -q -t rsa -b 4096 -N '' -C ocne-rac-lab -f &quot;$secret_dir/id_rsa&quot;
+kubectl create secret generic rac-db-password -n rac --from-file=key.pem=&quot;$secret_dir/key.pem&quot; --from-file=pwdfile.enc=&quot;$secret_dir/pwdfile.enc&quot;
+kubectl create secret generic rac-ssh-key -n rac --from-file=ssh-privkey=&quot;$secret_dir/id_rsa&quot; --from-file=ssh-pubkey=&quot;$secret_dir/id_rsa.pub&quot;
+# Only names, key counts and file permissions are displayed; no secret content.
+kubectl get secret -n rac rac-db-password rac-ssh-key
+stat -c '%a %U %n' &quot;$secret_dir&quot; &quot;$secret_dir/db-password.txt&quot; &quot;$secret_dir/id_rsa&quot;
+for node in ocne-w1.lab.test ocne-w2.lab.test; do
+ existing=$(kubectl get node &quot;$node&quot; -o jsonpath='{.metadata.labels.raccluster}')
+ [[ -z $existing || $existing == raccluster01 ]]
+ kubectl label node &quot;$node&quot; raccluster=raccluster01 --overwrite=false
+done
+kubectl get nodes -L raccluster
+</code></pre>
+<p>YAML encryption parameters must match RSA-OAEP/SHA256 above. Protect cluster-admin access and back up recovery material securely. Never overwrite existing database secrets as an installation retry.</p>
+<h3 id="3a14-final-prerequisites-gate">3a.14 Final prerequisites gate</h3>
+<p>Require recorded mounts/devices, matching image/ZIP hashes, private connectivity and DNS, successful RAC-sized diagnostic scheduling with pods removed, persistent OS/SELinux settings, synchronized time, healthy operator/certificates/RBAC, protected secrets, reviewed CVU results and NFS read/write. Confirm database/PDB/service names <strong>before</strong> immutable creation. Stop at any failed gate.</p>
+<h2 id="3b-provisioning-rac-step-by-step">3b. Provisioning RAC step by step</h2>
+<h3 id="3b1-review-the-source-and-complete-fresh-build-manifest">3b.1 Review the source and complete fresh-build manifest</h3>
+<p>This follows Oracle's <a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/racdb_prov.yaml">2.2.0 provisioning sample</a>, not the skeleton sample with a TODO. Names, digest, storage, encryption, gold homes and resource sizes are local substitutions. <a href="RAC-PROVISIONING-HANDOFF.md">Manifest provenance</a> maps these to the API/webhook/controller.</p>
+<p><strong>Fresh build only:</strong> save this as ~/ocne-rac-prereqs/rac-database.yaml on ocne-cp. The matching project source is <a href="../config/rac-database.yaml">config/rac-database.yaml</a>. ORACLE_PDB_NAME is explicit because this image reads it while operator2.2.0 emits ORACLE_PDB. Application service labpdb_app differs from the reserved automatic PDB service labpdb.</p>
+<pre><code class="language-yaml"># Fresh rebuild manifest. Existing rac19c has an immutable legacy service field.
+# For in-place reconciliation use rac-database-live.yaml; see docs/RAC-DEPLOYMENT.md.
+# Verified OL9 slim image and user-provided 19.32 gold ZIPs are staged on both workers.
+# No RU, OPatch, or one-off patch application is configured during provisioning.
+apiVersion: database.oracle.com/v4
+kind: RacDatabase
+metadata:
+  name: rac19c
+  namespace: rac
+spec:
+  instanceDetails:
+    nodeCount: 2
+    racHostSwLocation: /scratch/rac/cluster01
+    racNodeName: racnode
+    baseOnsTargetPort: 30200
+    baseLsnrTargetPort: 31522
+    privateIPDetails:
+      - name: macvlan-conf1
+        interface: ens1
+      - name: macvlan-conf2
+        interface: ens2
+    workerNodeSelector:
+      raccluster: raccluster01
+  # Immutable digest verified in CRI-O on both workers.
+  image: docker.io/roopla/oracle-rac@sha256:d4aa7fecb15b4f62caed83a0f445a275cc5bd8fbd1b01c7ac6216037b656566d
+  imagePullPolicy: IfNotPresent
+  # For a private registry, create the registry secret and set imagePullSecret.
+  sshKeySecret:
+    name: rac-ssh-key
+    privKeySecretName: ssh-privkey
+    pubKeySecretName: ssh-pubkey
+  dbSecret:
+    name: rac-db-password
+    keyFileName: key.pem
+    pwdFileName: pwdfile.enc
+    encryptionType: pkeyutl
+    pkeyopt: rsa_padding_mode:oaep;rsa_oaep_md:sha256;rsa_mgf1_md:sha256
+  asmDiskGroupDetails:
+    - name: DATA
+      redundancy: EXTERNAL
+      type: CRSDG
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm01
+        - /dev/disk/by-partlabel/ocne-rac-asm02
+  scanSvcName: racnode-scan
+  scanSvcTargetPort: 31521
+  serviceDetails:
+    name: labpdb_app
+    pdb: LABPDB
+    preferred:
+      - RACCDB1
+      - RACCDB2
+  envVars:
+    # Image 19.3.0-slim reads ORACLE_PDB_NAME; operator emits ORACLE_PDB.
+    - name: ORACLE_PDB_NAME
+      value: LABPDB
+    - name: LOG_DIR
+      value: /tmp/orod
+    - name: TOTAL_MEMORY
+      value: '16384'
+  # Per pod: 16 GiB ordinary memory; HugePages disabled by user request, 4 of 6 worker CPUs.
+  # This is a constrained lab profile, not validated RAC workload capacity.
+  resources:
+    requests:
+      cpu: '4'
+      memory: 16Gi
+    limits:
+      cpu: '4'
+      memory: 16Gi
+  securityContext:
+    sysctls:
+      - name: kernel.shmall
+        value: '2097152'
+      - name: kernel.shmmax
+        value: '8589934592'
+      - name: kernel.shmmni
+        value: '4096'
+      - name: kernel.sem
+        value: '250 32000 100 128'
+      - name: net.ipv4.conf.all.rp_filter
+        value: '2'
+  configParams:
+    gridHome: /u01/app/19c/grid
+    gridBase: /u01/app/grid
+    dbHome: /u01/app/oracle/product/19c/dbhome_1
+    dbBase: /u01/app/oracle
+    inventory: /u01/app/oraInventory
+    # Expected filenames; update these if your supplied ZIPs use other names.
+    gridSwZipFile: oracle-gridhome-19.32.zip
+    dbSwZipFile: oracle-dbhome-19.32.zip
+    hostSwStageLocation: /scratch/software/stage/19c/19.32-gold
+    sgaSize: 3G
+    pgaSize: 2G
+    processes: 500
+    cpuCount: 4
+    dbName: RACCDB
+    pdbName: LABPDB
+
+</code></pre>
+<p>No ruPatchLocation/oPatchLocation/oneOffLocation is used with these already-patched homes. shmmax8GiB and shmall2097152 on4KiB pages are ceilings, not preallocations. Requests/limits contain no HugePages resource.</p>
+<h3 id="3b2-transfer-compare-and-validate">3b.2 Transfer, compare and validate</h3>
+<p><strong>Windows PowerShell:</strong></p>
+<pre><code class="language-powershell">Get-FileHash .\config\rac-database.yaml -Algorithm SHA256
+scp .\config\rac-database.yaml ocne-cp:~/ocne-rac-prereqs/rac-database.yaml
+</code></pre>
+<p>Equivalent <strong>Git Bash</strong>:</p>
+<pre><code class="language-bash">sha256sum config/rac-database.yaml
+scp config/rac-database.yaml ocne-cp:~/ocne-rac-prereqs/rac-database.yaml
+</code></pre>
+<p><strong>ocne-cp as labadmin</strong>, compare hashes and check absence/admission:</p>
+<pre><code class="language-bash">set -euo pipefail
+cd ~/ocne-rac-prereqs
+sha256sum rac-database.yaml
+kubectl get racdatabases -A
+kubectl get pods,pvc,services -n rac
+kubectl get pv
+test -z &quot;$(kubectl get racdatabase rac19c -n rac --ignore-not-found -o name)&quot;
+kubectl create --dry-run=server -f rac-database.yaml
+</code></pre>
+<p>Expected: <code>racdatabase.database.oracle.com/rac19c created (server dry run)</code>, with no resource actually created. This tests schema/admission, not disk/image contents or a working database. If rac19c exists, stop: this is the wrong path. Do not delete a live CR or disable its webhook to bypass an immutable-field error.</p>
+<h3 id="3b3-create-once-and-watch">3b.3 Create once and watch</h3>
+<pre><code class="language-bash">kubectl create -f ~/ocne-rac-prereqs/rac-database.yaml
+kubectl get racdatabase rac19c -n rac -w
+</code></pre>
+<p>Expected: <code>racdatabase.database.oracle.com/rac19c created</code>. Ctrl+C stops only the watch. In another SSH session:</p>
+<pre><code class="language-bash">kubectl get pods,statefulsets,pvc,services -n rac -o wide
+kubectl get pv
+kubectl get events -n rac --sort-by=.metadata.creationTimestamp
+</code></pre>
+<p>The operator creates storage/network objects and StatefulSets, starts slim containers, extracts homes, configures GI/ASM and runs DBCA. Do not launch a second installer when progress is slow. The successful DBCA retry here took roughly36minutes (09:43-10:19EDT); speed varies. Completion requires Kubernetes Ready, operator AVAILABLE, CRS/ASM healthy, SQL OPEN/PDB READ WRITE and working network services.</p>
+<h3 id="3b4-monitor-the-right-layer">3b.4 Monitor the right layer</h3>
+<pre><code class="language-bash">kubectl describe pod racnode1-0 -n rac
+kubectl describe pod racnode2-0 -n rac
+kubectl logs deployment/oracle-database-operator-controller-manager -n oracle-database-operator-system --tail=100
+kubectl exec -n rac racnode1-0 -- ls -lt /u01/app/oracle/cfgtoollogs/dbca/RACCDB
+kubectl get racdatabase rac19c -n rac -o jsonpath='{.status.state}{&quot;\n&quot;}'
+</code></pre>
+<p>Events/describe show scheduling, image, volume and CNI failures. Operator logs show reconciliation; GI/DBCA logs show Oracle progress. Inspect installer logs <strong>locally</strong>: command lines may contain passwords. Choose the newest retry log rather than assuming the original RACCDB.log contains current progress. Known-password redaction in project helpers does not guarantee arbitrary logs are safe to publish.</p>
+<h3 id="3b5-verify-crs-and-asm">3b.5 Verify CRS and ASM</h3>
+<pre><code class="language-bash">kubectl wait -n rac --for=condition=Ready pod/racnode1-0 pod/racnode2-0 --timeout=300s
+kubectl exec -n rac racnode1-0 -- /u01/app/19c/grid/bin/crsctl check crs
+kubectl exec -n rac racnode2-0 -- /u01/app/19c/grid/bin/crsctl check crs
+kubectl exec -n rac racnode1-0 -- /u01/app/19c/grid/bin/olsnodes -n
+kubectl exec -n rac racnode1-0 -- /u01/app/19c/grid/bin/crsctl stat res -t
+kubectl exec -n rac racnode1-0 -- su - grid -c 'export ORACLE_SID=+ASM1; /u01/app/19c/grid/bin/asmcmd lsdg'
+kubectl exec -n rac racnode2-0 -- su - grid -c 'export ORACLE_SID=+ASM2; /u01/app/19c/grid/bin/asmcmd lsdg'
+</code></pre>
+<p>Require CRS online on both nodes, both node names, DATA MOUNTED, zero offline disks and voting files present. Recorded DATA:102392MB total/90040MB free, EXTERN; free space changes with use. Never reformat disks because a status check fails.</p>
+<h3 id="3b6-verify-sql-names-memory-and-patch-inventories">3b.6 Verify SQL names, memory and patch inventories</h3>
+<p><strong>Bash on ocne-cp.</strong> Quoted heredocs protect <code>$</code> in Oracle view names:</p>
+<pre><code class="language-bash">kubectl exec -i -n rac racnode1-0 -- su - oracle -c &quot;export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '/ as sysdba'&quot; &lt;&lt;'SQL'
+whenever oserror exit failure
+whenever sqlerror exit failure
+set lines 200 pages 100
+select inst_id,instance_name,status,database_status from gv$instance order by inst_id;
+select name,open_mode,database_role from v$database;
+select inst_id,name,open_mode from gv$pdbs order by inst_id,con_id;
+select inst_id,name,value from gv$parameter where name in ('sga_target','sga_max_size','pga_aggregate_target','use_large_pages') order by name,inst_id;
+select con_id,patch_id,action,status,description from cdb_registry_sqlpatch order by con_id,action_time;
+select con_id,comp_id,status from cdb_registry where status &lt;&gt; 'VALID';
+exit
+SQL
+for pod in racnode1-0 racnode2-0; do
+  kubectl exec -n rac &quot;$pod&quot; -- su - grid -c '/u01/app/19c/grid/OPatch/opatch lspatches'
+  kubectl exec -n rac &quot;$pod&quot; -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/OPatch/opatch lspatches'
+done
+</code></pre>
+<p>Require two OPEN/ACTIVE instances, RACCDB PRIMARY/READ WRITE, LABPDB READ WRITE on both, SGA target/max3221225472, PGA2147483648, and successful RU39472050/OJVM39222882 dictionary records in root and LABPDB. The invalid-component query must return no rows. If ORCLPDB appears, inspect the image-variable mismatch before application loading.</p>
+<p>With host HugePages0 Oracle can use ordinary memory while USE_LARGE_PAGES remains TRUE (fallback). To make the owner's choice <strong>explicitly FALSE</strong>, perform this post-creation database restart before workloads, only after DBCA finished and both instances are OPEN:</p>
+<pre><code class="language-bash">kubectl exec -i -n rac racnode1-0 -- su - oracle -c &quot;export ORACLE_SID=RACCDB1; /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -s '/ as sysdba'&quot; &lt;&lt;'SQL'
+whenever sqlerror exit failure
+alter system set use_large_pages='FALSE' scope=spfile sid='*';
+alter pluggable database LABPDB save state instances=all;
+exit
+SQL
+kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl stop database -db RACCDB -stopoption IMMEDIATE'
+kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl start database -db RACCDB'
+</code></pre>
+<p>Repeat SQL memory/PDB/service checks. This restarts the database, not pods or GI. <a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/USE_LARGE_PAGES.html">Oracle USE_LARGE_PAGES reference</a>.</p>
+<h3 id="3b7-verify-the-application-service-and-network-sql">3b.7 Verify the application service and network SQL</h3>
+<pre><code class="language-bash">kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl config service -db RACCDB -service labpdb_app'
+kubectl exec -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status service -db RACCDB'
+kubectl get services,endpointslices -n rac
+</code></pre>
+<p>Require labpdb_app mapped to LABPDB on both instances. The corrected fresh YAML requests this. The original lab required SRVCTL creation after correcting its PDB; that is an incident recovery, not a second service-create step for fresh builds.</p>
+<p>For a password-prompted SQL test, start an interactive client:</p>
+<pre><code class="language-bash">kubectl exec -it -n rac racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/sqlplus /nolog'
+</code></pre>
+<p>At SQL&gt;, enter each connection then the password at its prompt. Retrieve the password only in a private session from protected recovery material; never put it in the command:</p>
+<pre><code class="language-sql">connect system@//192.168.77.12:31522/labpdb_app
+select sys_context('USERENV','CON_NAME'),sys_context('USERENV','INSTANCE_NAME') from dual;
+connect system@//192.168.77.13:31523/labpdb_app
+select sys_context('USERENV','CON_NAME'),sys_context('USERENV','INSTANCE_NAME') from dual;
+exit
+</code></pre>
+<p>Expected LABPDB/RACCDB1 then LABPDB/RACCDB2. Both passed11October18:45UTC, with a SQL client in racnode1-0 traversing the worker listeners. Control-plane TCP reachability to both ports also passed. This is distinct from a Windows GUI test.</p>
+<h3 id="3b8-connect-from-windows">3b.8 Connect from Windows</h3>
+<p>The NAT subnet has no direct Windows route. Keep this <strong>PowerShell or Git Bash</strong> SSH tunnel open:</p>
+<pre><code class="language-bash">ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:31522:192.168.77.12:31522 -L 127.0.0.1:31523:192.168.77.13:31523 ocne-cp
+</code></pre>
+<p>SQL Developer: Basic connection, host127.0.0.1, port31522 (or31523), <strong>service name labpdb_app</strong>, database credentials. Do not use SID LABPDB. With workstation SQL*Plus:</p>
+<pre><code class="language-bash">sqlplus system@//127.0.0.1:31522/labpdb_app
+</code></pre>
+<p>Enter the prompted password and run SYS_CONTEXT checks. A Windows SQL client session was not captured in this run. A tunnel alone does not prove SQL connectivity: inspect listener redirect/handler addresses if it redirects outside the accessible route. SCAN is cluster DNS, not automatically Windows DNS. <a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/database_connection.md">Oracle operator connection procedure</a>.</p>
+<h3 id="3b9-completion-and-current-lab-differences">3b.9 Completion and current-lab differences</h3>
+<p>Require all CRS/ASM, SQL, patch, PDB and network checks, then establish backups before failure exercises. The full captured transcript is in chapter4.</p>
+<p>The original run completed DBCA10:19EDT11October after password/memory recovery. A database restart established USE_LARGE_PAGES=FALSE. Two differences remain from a clean build:</p>
+<ol>
+<li>Existing CR serviceDetails.name is immutable <strong>labpdb</strong>; actual application service <strong>labpdb_app</strong> is separately SRVCTL-managed. Displayed PDB connect string remains ORCLPDB. SQL verifies real LABPDB/service state. Use <a href="../config/rac-database-live.yaml">rac-database-live.yaml</a> for this CR, not the fresh YAML.</li>
+<li>Existing pods retain old hugepages resource/cgroup declarations while worker pools/consumption are zero and SQL uses ordinary pages. Desired CR/StatefulSet templates have no HugePages resource. StatefulSets use OnDelete to prevent an automatic GI restart during recovery. Pods have not been recreated and kubelet capacity advertisement may remain stale until maintenance. Reservation metadata is not proof of allocated hugepage memory.</li>
+</ol>
+<p>The corrected fresh-build YAML has <strong>not</strong> been tested by a complete new rebuild. The original successful create dry-run preceded some corrections; repeat it in your fresh environment. Existing-CR reconciliation was separately verified. Updated documentation is not a new deployment test.</p>
+<p>Sources: <a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/rackb/install-configure-rac-olcne.html">Oracle RAC on OCNE</a>, <a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/provisioning_oracle_rac_db.md">pinned provisioning procedure</a>, <a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/stordev/stordev-UsingDiskPartitions.html">Oracle Linux partition management</a>, <a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/storage.html">VirtualBox storage</a>. Windows orchestration/resource sizes and the zero-HugePages choice are local lab adaptations.</p>
+<p><a href="MANUAL-04-RAC-OPERATIONS.html">Continue to 4. Operations</a></p>
+<h2 id="3b-post-provisioning-recovery-prerequisite">3b. Post-provisioning recovery prerequisite</h2>
+<p>Before the first pod/container replacement or worker restart, preserve each node?s /etc/oracle on its own persistent /u01 volume, restore the worker-side SELinux policy labels, and take an RMAN backup. Follow the exact <a href="RAC-POD-EXERCISES.html#s05-s08-instances-and-one-pod-replacement">GI backup and assisted-recovery procedure</a> and <a href="RAC-POD-EXERCISES.html#s23-s26-planned-outages-backups-and-template-updates">backup commands</a>. A successful database creation did not create the required recovery copy in this supplied 19c image. The first replacement also required manual GI OS-file reconstruction/startup. These are observed limitations to address before assuming unattended recovery; do not skip them in a manual rebuild.</p>
+</main></body></html>

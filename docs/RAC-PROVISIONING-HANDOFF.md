@@ -1,5 +1,9 @@
 # RAC provisioning handoff
 
+**Current status, 11 October 2026:** RAC is provisioned and SQL/patch/network acceptance passed. This document retains prerequisite-stage evidence; older not-provisioned/pending statements below are historical. For current instructions use the [four-part manual](OCNE-RAC-END-TO-END-MANUAL.md) and [deployment record](RAC-DEPLOYMENT.md). Fresh/live manifests differ because the original service name is immutable. Pod restart/restore acceptance remains unverified.
+
+**Current execution status:** the user authorized RAC provisioning on 10 October at 22:14 EDT, and the manifest has been applied. See [deployment progress and acceptance](RAC-DEPLOYMENT.md). Earlier prerequisite-only statements below describe the handoff before that authorization.
+
 RAC has **not** been provisioned. The operator's server-side create dry-run accepted [config/rac-database.yaml](../config/rac-database.yaml), and no RacDatabase resource exists. Prerequisite preparation is complete, including the user's confirmation that DBCA fix 34436514 is unnecessary for the supplied home. The manifest is ready for the user's final review and application. A successful dry-run validates API/admission rules, not image availability, gold-home contents or a working database.
 
 For a manual rebuild, follow [the prerequisite guide](RAC-PREREQUISITES-GUIDE.md), including its direct Bash command appendix. Actual results are in [the run log](CLONING-RUN-LOG.md) and [readiness inventory](RAC-READINESS.md).
@@ -19,20 +23,20 @@ The sample provides the two-node structure, Oracle home paths, private-network r
 | Networks and placement | Two nodes, `macvlan-conf1`/`macvlan-conf2`, `ens1`/`ens2`, `raccluster=raccluster01` | Retained and matched to the installed NADs and worker labels; ONS/listener base target ports explicitly set to 30200/31522 |
 | Credentials | `ssh-key-secret`, `db-user-pass`; pkeyutl options commented | Existing `rac-ssh-key` and `rac-db-password`; explicit pkeyutl OAEP/SHA256 options matching the prepared secret |
 | TDE | Includes `tdeWalletSecret` | Omitted; TDE was not configured for this lab |
-| CPU and memory | No explicit resource block in this sample | Each pod requests/limits 4 CPUs, 16 GiB ordinary memory and 3 GiB HugePages on a 22 GiB/6 CPU worker; adds pod sysctls matching prepared host settings |
-| Database settings | `PORCLCDB`, service `soepdb` | `RACCDB`, PDB `LABPDB`, service `labpdb`; SGA 3G, PGA 2G, 500 processes, cpuCount 4 and TOTAL_MEMORY 19456 for this constrained lab |
+| CPU and memory | No explicit resource block in this sample | Each pod requests/limits 4 CPUs, 16 GiB ordinary memory with HugePages disabled on a 22 GiB/6 CPU worker; adds pod sysctls matching prepared host settings |
+| Database settings | `PORCLCDB`, service `soepdb` | `RACCDB`, PDB `LABPDB`, application service `labpdb_app` targeting LABPDB on RACCDB1/RACCDB2; explicit ORACLE_PDB_NAME=LABPDB for the image, SGA 3G, PGA 2G, 500 processes, cpuCount 4 and TOTAL_MEMORY 16384 for this constrained lab |
 | Patch application | Base gold-home example has no patch-application fields | Retained the gold-home route; no RU/OPatch/one-off application fields, because supplied homes are already patched |
 
-The added fields were checked against the pinned [RacDatabase API types](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_types.go), [admission validation](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_webhook.go), and [pod construction code](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/commons/crs/rac/racprovcluster.go). In particular, the operator requires at least 16 GiB ordinary memory; HugePages are additional. These resource choices are lab sizing, not Oracle-validated RAC capacity. Prerequisite-ignore and webhook development-mode flags are not enabled.
+The added fields were checked against the pinned [RacDatabase API types](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_types.go), [admission validation](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/apis/database/v4/racdatabase_webhook.go), and [pod construction code](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/commons/crs/rac/racprovcluster.go). In particular, the operator requires at least 16 GiB ordinary memory; The current user-requested profile disables HugePages. These resource choices are lab sizing, not Oracle-validated RAC capacity. Prerequisite-ignore and webhook development-mode flags are not enabled.
 
-Validation already performed: YAML parsing, image/ZIP staging checks, exact Windows/control-plane manifest SHA256 match, and successful server-side create dry-run on 10 October at 21:39 EDT. The resource has **not been applied**. API acceptance does not prove database runtime behavior; the user-confirmed DBCA fix decision and post-provisioning checks are documented below and in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
+Validation already performed: YAML parsing, image/ZIP staging checks, exact Windows/control-plane manifest SHA256 match, and successful server-side create dry-run on 10 October at 21:39 EDT. The resource was applied with user authorization on 10 October; see [current deployment](RAC-DEPLOYMENT.md). API acceptance does not prove database runtime behavior; the user-confirmed DBCA fix decision and post-provisioning checks are documented below and in [artifact acceptance](RAC-ARTIFACT-ACCEPTANCE.md).
 
 ## Prepared infrastructure
 
 - Two 22 GiB/6 CPU workers, each with 128GiB scratch and its existing 100 GiB container disk.
-- Two shared 50 GiB ASM partitions, identified by persistent labels; unformatted and unused by ASM.
+- Two shared 50 GiB ASM partitions, identified by persistent labels; now in use by the configured DATA ASM disk group; never reformat them.
 - Two tested private macvlan interconnects, OCNE Multus, worker labels, and mounted host NFS.
-- Kernel settings, 3 GiB HugePages per worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
+- Kernel settings, HugePages disabled on each worker, disabled THP, Oracle's SELinux module with Enforcing retained, and Oracle home directories.
 - Cert-manager1.17.4, Database Operator 2.2.0, required RBAC and Ready operator certificates.
 - Protected database-password and RAC SSH secrets.
 
@@ -135,13 +139,13 @@ kubectl get pvc -n rac
 kubectl create --dry-run=server -f ~/ocne-rac-prereqs/rac-database.yaml
 ```
 
-After editing the Windows YAML, copy that exact version to ocne-cp before the dry-run. Inspect the worker resource budgets and both gold files/images as above. Re-run the worker/network/NFS checks if any relevant setting changed. The final YAML requests 4CPUs,16 GiB ordinary memory and3GiB HugePages per pod; it sets SGA3G and PGA2G for this limited lab. Do not set prerequisite-ignore or webhook development-mode flags to make acceptance pass.
+After editing the Windows YAML, copy that exact version to ocne-cp before the dry-run. Inspect the worker resource budgets and both gold files/images as above. Re-run the worker/network/NFS checks if any relevant setting changed. The final YAML requests 4 CPUs and 16 GiB ordinary memory per pod, with HugePages disabled; it sets SGA3G and PGA2G for this limited lab. Do not set prerequisite-ignore or webhook development-mode flags to make acceptance pass.
 
 Credential recovery is local to ocne-cp: ~/.local/share/ocne-rac-secrets/db-password.txt, protected 0600 under a0700 directory. Retrieve it only in your private interactive session; do not paste it into chat, documentation or Git. Kubernetes secrets already exist and are referenced by name in the YAML.
 
-## 5. User-only provisioning step (not executed by Codex)
+## 5. Provisioning and acceptance
 
-Only after the preceding gates pass, the user may run on ocne-cp:
+On a fresh build, after the preceding gates pass, run on ocne-cp. This deployment has already been applied:
 
 ```bash
 kubectl apply -f ~/ocne-rac-prereqs/rac-database.yaml
@@ -151,6 +155,6 @@ kubectl get pv
 kubectl logs -n oracle-database-operator-system deployment/oracle-database-operator-controller-manager --tail=100
 ```
 
-Treat operator logs as potentially sensitive; inspect locally rather than publishing them unreviewed. Follow the [pinned RAC provisioning procedure](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/provisioning_oracle_rac_db.md) for GI/ASM/database acceptance. Verify that there is one RAC node on each worker, CRS/ASM and database services are healthy, the intended patch inventories are present, SQL connections work and pod/worker recovery behaves correctly. None of these database tests has run in this prerequisite-only handoff.
+Treat operator logs as potentially sensitive; inspect locally rather than publishing them unreviewed. Follow the [pinned RAC provisioning procedure](https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/provisioning_oracle_rac_db.md) for GI/ASM/database acceptance. Verify that there is one RAC node on each worker, CRS/ASM and database services are healthy, the intended patch inventories are present, SQL connections work and pod/worker recovery behaves correctly. See [actual deployment and acceptance](RAC-DEPLOYMENT.md) for executed checks and outstanding work.
 
 The current YAML uses cluster services and has no Windows database port-forward configuration. Establish and test the intended client access route after provisioning; Windows hosts entries alone do not route into the VirtualBox NAT subnet. Do not delete the RacDatabase or its storage as a troubleshooting shortcut.

@@ -1,4 +1,4 @@
-"""Render the two guide HTML copies and statically validate project documentation.
+"""Render guide and manual HTML copies and statically validate project documentation.
 Dependency: Markdown==3.7 installed under private/doc-tools (see README).
 No VM, network, SSH, or guest commands are executed.
 """
@@ -24,6 +24,11 @@ if markdown.__version__ != "3.7":
 GUIDES = [
     ROOT / "docs/OCNE-1.9-Golden-VM-Cloning-Guide.md",
     ROOT / "docs/OCNE-1.9-OL9-Setup-Guide.md",
+    ROOT / "docs/OCNE-RAC-END-TO-END-MANUAL.md",
+    *sorted((ROOT / "docs").glob("MANUAL-*.md")),
+    ROOT / "docs/RAC-POD-EXERCISES.md",
+    ROOT / "docs/RAC-TEST-SCENARIO-MATRIX.md",
+    *sorted((ROOT / "docs").glob("RAC-EXERCISE-*-OUTPUT.md")),
 ]
 CSS = """
 body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
@@ -35,7 +40,8 @@ pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.
 pre code{padding:0;background:none;color:inherit;white-space:pre}
 table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
 th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
-tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
 @media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
 @media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
 pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
@@ -46,18 +52,36 @@ def render_body(source):
     return markdown.markdown(source, extensions=["fenced_code", "tables", "toc", "sane_lists"],
                              output_format="html5")
 
+def page_body(path, source):
+    body = render_body(source)
+    index = 0
+    def diagram(match):
+        nonlocal index
+        index += 1
+        relative = "diagrams/" + path.stem.lower() + f"-{index}.svg"
+        if not (path.parent / relative).exists():
+            return match.group(0)
+        return (f'<img class="diagram" src="{relative}" alt="{escape(path.stem)} diagram {index}">'
+                '<details><summary>Mermaid diagram source</summary>' + match.group(0) + '</details>')
+    body = re.sub(r'<pre><code class="language-mermaid">.*?</code></pre>', diagram, body, flags=re.S)
+    for guide in GUIDES:
+        body = body.replace('href="'+guide.name, 'href="'+guide.with_suffix('.html').name)
+    return body
+
+
 def page(path):
     source = path.read_text(encoding="utf-8")
     title = source.splitlines()[0].lstrip("# ")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    layout = ' class="scenario-matrix"' if path.stem == "RAC-TEST-SCENARIO-MATRIX" else ""
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f"<title>{escape(title)}</title><style>{CSS}</style></head>\n<body><main>\n"
+        f"<title>{escape(title)}</title><style>{CSS}</style></head>\n<body{layout}><main>\n"
         f'<!-- Source SHA256: {digest}; renderer Markdown 3.7 -->\n'
         f'<p class="notice">Generated from <a href="{path.name}">the Markdown source</a>. '
         'Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>\n'
-        + render_body(source) + "\n</main></body></html>\n"
+        + page_body(path, source) + "\n</main></body></html>\n"
     )
 
 class Elements(HTMLParser):
@@ -150,7 +174,7 @@ def validate():
     if errors:
         raise SystemExit("\n".join(errors))
     print(f"PASS: {len(documents)} Markdown files, {local_links} local links, "
-          "fence/code preservation, heading IDs, project paths, UTF-8, and both HTML copies.")
+          "fence/code preservation, heading IDs, project paths, UTF-8, and all generated HTML copies.")
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)

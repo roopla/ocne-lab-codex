@@ -1,0 +1,14 @@
+flowchart TB
+ W["Windows workstation\nD:/OCNE19-Lab"] -->|"SSH 2220-2223"| N["VirtualBox NAT network\n192.168.77.0/24"]
+ N --> O["ocne-op .10\nOCNE CLI/API + NFS\n4 GiB / 2 CPU"]
+ N --> C["ocne-cp .11\nKubernetes control plane\n8 GiB / 4 CPU"]
+ N --> A["ocne-w1 .12\n22 GiB / 6 CPU\nracnode1-0: RACCDB1"]
+ N --> B["ocne-w2 .13\n22 GiB / 6 CPU\nracnode2-0: RACCDB2"]
+ C --> D["Database Operator 2.2.0\nwatches rac/rac19c"]
+ D --> A
+ D --> B
+ A <-->|"private .78 and .79 interconnects"| B
+ A --> S[("Shared ASM DATA\n2 x 50 GiB\nEXTERNAL redundancy")]
+ B --> S
+ O --> F[("Separate 100 GiB NFS\n/srv/nfs/share")]
+ G["ol9-golden\npreserved, powered off"] -.->|"full clones, once"| N

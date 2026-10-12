@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Pod, network and storage precheck output</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: b219d695b886c3d14b21549263045e836be9d8c3199de65f7f982d9e17edea28; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="RAC-EXERCISE-BASELINE-OUTPUT.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="pod-network-and-storage-precheck-output">Pod, network and storage precheck output</h1>
+<p><a href="MANUAL-04-RAC-OPERATIONS.html">Operations chapter</a> | <a href="RAC-POD-EXERCISES.html">Scenario workbook</a></p>
+<p>This capture stopped with exit2 at the missing GI recovery-directory check. It is a FAILED restart prerequisite, not a failed running database. Later commands were not run by this invocation.</p>
+<p>Complete command output, 11 October 2026; tabs expanded only for rendering. The collector prints argument lists joined with spaces; copy the properly quoted commands from the workbook rather than treating every printed argument list as a new shell command. No Secret values are included.</p>
+<pre><code class="language-text">Captured UTC: 2026-10-11T19:04:06.705728+00:00
+
+SCENARIO A: pod identity, placement, resource and readiness inventory
+
+$ kubectl -n rac get pods -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,NODE:.spec.nodeName,PHASE:.status.phase
+NAME         UID                                    NODE               PHASE
+racnode1-0   0ad8f3ab-5b3c-4ca4-bf74-a9510a653bc4   ocne-w1.lab.test   Running
+racnode2-0   fb9bdc6d-2737-4291-bedd-121e30724c0a   ocne-w2.lab.test   Running
+Exit code: 0
+Pod readiness/probes: racnode1-0
+{
+  &quot;conditions&quot;: [
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;PodReadyToStartContainers&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;Initialized&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:52Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;Ready&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:52Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;ContainersReady&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:21Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;PodScheduled&quot;
+    }
+  ],
+  &quot;containers&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode1-0&quot;,
+      &quot;resources&quot;: {
+        &quot;limits&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        },
+        &quot;requests&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        }
+      },
+      &quot;readinessProbe&quot;: {
+        &quot;failureThreshold&quot;: 3,
+        &quot;initialDelaySeconds&quot;: 180,
+        &quot;periodSeconds&quot;: 5,
+        &quot;successThreshold&quot;: 1,
+        &quot;tcpSocket&quot;: {
+          &quot;port&quot;: 31522
+        },
+        &quot;timeoutSeconds&quot;: 1
+      },
+      &quot;livenessProbe&quot;: null,
+      &quot;startupProbe&quot;: null
+    }
+  ]
+}
+Pod readiness/probes: racnode2-0
+{
+  &quot;conditions&quot;: [
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;PodReadyToStartContainers&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:22Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;Initialized&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:51Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;Ready&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T14:19:51Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;ContainersReady&quot;
+    },
+    {
+      &quot;lastProbeTime&quot;: null,
+      &quot;lastTransitionTime&quot;: &quot;2026-10-11T02:14:21Z&quot;,
+      &quot;status&quot;: &quot;True&quot;,
+      &quot;type&quot;: &quot;PodScheduled&quot;
+    }
+  ],
+  &quot;containers&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode2-0&quot;,
+      &quot;resources&quot;: {
+        &quot;limits&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        },
+        &quot;requests&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;hugepages-2Mi&quot;: &quot;3Gi&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        }
+      },
+      &quot;readinessProbe&quot;: {
+        &quot;failureThreshold&quot;: 3,
+        &quot;initialDelaySeconds&quot;: 180,
+        &quot;periodSeconds&quot;: 5,
+        &quot;successThreshold&quot;: 1,
+        &quot;tcpSocket&quot;: {
+          &quot;port&quot;: 31522
+        },
+        &quot;timeoutSeconds&quot;: 1
+      },
+      &quot;livenessProbe&quot;: null,
+      &quot;startupProbe&quot;: null
+    }
+  ]
+}
+Desired StatefulSet: racnode1
+{
+  &quot;strategy&quot;: {
+    &quot;type&quot;: &quot;OnDelete&quot;
+  },
+  &quot;replicas&quot;: 1,
+  &quot;affinity&quot;: {
+    &quot;nodeAffinity&quot;: {
+      &quot;requiredDuringSchedulingIgnoredDuringExecution&quot;: {
+        &quot;nodeSelectorTerms&quot;: [
+          {
+            &quot;matchExpressions&quot;: [
+              {
+                &quot;key&quot;: &quot;raccluster&quot;,
+                &quot;operator&quot;: &quot;In&quot;,
+                &quot;values&quot;: [
+                  &quot;raccluster01&quot;
+                ]
+              },
+              {
+                &quot;key&quot;: &quot;kubernetes.io/hostname&quot;,
+                &quot;operator&quot;: &quot;In&quot;,
+                &quot;values&quot;: [
+                  &quot;ocne-w1.lab.test&quot;
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  &quot;volumes&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode1-ssh-secretmap-vol&quot;,
+      &quot;secret&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;secretName&quot;: &quot;rac-ssh-key&quot;
+      }
+    },
+    {
+      &quot;emptyDir&quot;: {
+        &quot;medium&quot;: &quot;Memory&quot;
+      },
+      &quot;name&quot;: &quot;racnode1-oradshm-vol&quot;
+    },
+    {
+      &quot;name&quot;: &quot;racnode1-dbsecret-pwd-vol&quot;,
+      &quot;secret&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;secretName&quot;: &quot;rac-db-password&quot;
+      }
+    },
+    {
+      &quot;configMap&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;name&quot;: &quot;racnode1rac19c-cmap&quot;
+      },
+      &quot;name&quot;: &quot;racnode1-oradata-envfile&quot;
+    },
+    {
+      &quot;hostPath&quot;: {
+        &quot;path&quot;: &quot;/scratch/rac/cluster01/racnode1&quot;,
+        &quot;type&quot;: &quot;&quot;
+      },
+      &quot;name&quot;: &quot;racnode1-oradata-sw-vol&quot;
+    },
+    {
+      &quot;hostPath&quot;: {
+        &quot;path&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+        &quot;type&quot;: &quot;&quot;
+      },
+      &quot;name&quot;: &quot;racnode1-oradata-swstage-vol&quot;
+    },
+    {
+      &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;,
+      &quot;persistentVolumeClaim&quot;: {
+        &quot;claimName&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;,
+      &quot;persistentVolumeClaim&quot;: {
+        &quot;claimName&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+      }
+    },
+    {
+      &quot;emptyDir&quot;: {},
+      &quot;name&quot;: &quot;racnode1-oradata-envfile-writable&quot;
+    }
+  ],
+  &quot;containers&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode1-0&quot;,
+      &quot;resources&quot;: {
+        &quot;limits&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        },
+        &quot;requests&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        }
+      },
+      &quot;pdbEnvironment&quot;: [
+        {
+          &quot;name&quot;: &quot;ORACLE_PDB_NAME&quot;,
+          &quot;value&quot;: &quot;LABPDB&quot;
+        }
+      ]
+    }
+  ]
+}
+Desired StatefulSet: racnode2
+{
+  &quot;strategy&quot;: {
+    &quot;type&quot;: &quot;OnDelete&quot;
+  },
+  &quot;replicas&quot;: 1,
+  &quot;affinity&quot;: {
+    &quot;nodeAffinity&quot;: {
+      &quot;requiredDuringSchedulingIgnoredDuringExecution&quot;: {
+        &quot;nodeSelectorTerms&quot;: [
+          {
+            &quot;matchExpressions&quot;: [
+              {
+                &quot;key&quot;: &quot;raccluster&quot;,
+                &quot;operator&quot;: &quot;In&quot;,
+                &quot;values&quot;: [
+                  &quot;raccluster01&quot;
+                ]
+              },
+              {
+                &quot;key&quot;: &quot;kubernetes.io/hostname&quot;,
+                &quot;operator&quot;: &quot;In&quot;,
+                &quot;values&quot;: [
+                  &quot;ocne-w2.lab.test&quot;
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  &quot;volumes&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode2-ssh-secretmap-vol&quot;,
+      &quot;secret&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;secretName&quot;: &quot;rac-ssh-key&quot;
+      }
+    },
+    {
+      &quot;emptyDir&quot;: {
+        &quot;medium&quot;: &quot;Memory&quot;
+      },
+      &quot;name&quot;: &quot;racnode2-oradshm-vol&quot;
+    },
+    {
+      &quot;name&quot;: &quot;racnode2-dbsecret-pwd-vol&quot;,
+      &quot;secret&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;secretName&quot;: &quot;rac-db-password&quot;
+      }
+    },
+    {
+      &quot;configMap&quot;: {
+        &quot;defaultMode&quot;: 420,
+        &quot;name&quot;: &quot;racnode2rac19c-cmap&quot;
+      },
+      &quot;name&quot;: &quot;racnode2-oradata-envfile&quot;
+    },
+    {
+      &quot;hostPath&quot;: {
+        &quot;path&quot;: &quot;/scratch/rac/cluster01/racnode2&quot;,
+        &quot;type&quot;: &quot;&quot;
+      },
+      &quot;name&quot;: &quot;racnode2-oradata-sw-vol&quot;
+    },
+    {
+      &quot;hostPath&quot;: {
+        &quot;path&quot;: &quot;/scratch/software/stage/19c/19.32-gold&quot;,
+        &quot;type&quot;: &quot;&quot;
+      },
+      &quot;name&quot;: &quot;racnode2-oradata-swstage-vol&quot;
+    },
+    {
+      &quot;name&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;,
+      &quot;persistentVolumeClaim&quot;: {
+        &quot;claimName&quot;: &quot;asm-pvc-16e0716b-rac19c&quot;
+      }
+    },
+    {
+      &quot;name&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;,
+      &quot;persistentVolumeClaim&quot;: {
+        &quot;claimName&quot;: &quot;asm-pvc-ee86c2c9-rac19c&quot;
+      }
+    },
+    {
+      &quot;emptyDir&quot;: {},
+      &quot;name&quot;: &quot;racnode2-oradata-envfile-writable&quot;
+    }
+  ],
+  &quot;containers&quot;: [
+    {
+      &quot;name&quot;: &quot;racnode2-0&quot;,
+      &quot;resources&quot;: {
+        &quot;limits&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        },
+        &quot;requests&quot;: {
+          &quot;cpu&quot;: &quot;4&quot;,
+          &quot;memory&quot;: &quot;16Gi&quot;
+        }
+      },
+      &quot;pdbEnvironment&quot;: [
+        {
+          &quot;name&quot;: &quot;ORACLE_PDB_NAME&quot;,
+          &quot;value&quot;: &quot;LABPDB&quot;
+        }
+      ]
+    }
+  ]
+}
+
+SCENARIO B: network Services and endpoints
+
+$ kubectl -n rac get services -o wide
+NAME                TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)           AGE   SELECTOR
+racnode-scan        ClusterIP   None             &lt;none&gt;        &lt;none&gt;            16h   app=oracle-database-operator,database.oracle.com/component=RAC,database.oracle.com/managed-by=racdatabase-controller,database.oracle.com/name=rac19c
+racnode-scan-lsnr   NodePort    10.104.49.126    &lt;none&gt;        1521:31521/TCP    16h   statefulset.kubernetes.io/pod-name=racnode1-0
+racnode1-0          ClusterIP   None             &lt;none&gt;        &lt;none&gt;            16h   statefulset.kubernetes.io/pod-name=racnode1-0
+racnode1-0-lsnr     NodePort    10.96.75.114     &lt;none&gt;        31522:31522/TCP   16h   statefulset.kubernetes.io/pod-name=racnode1-0
+racnode1-0-ons      NodePort    10.96.6.122      &lt;none&gt;        6200:30200/TCP    16h   statefulset.kubernetes.io/pod-name=racnode1-0
+racnode1-0-vip      ClusterIP   None             &lt;none&gt;        &lt;none&gt;            16h   statefulset.kubernetes.io/pod-name=racnode1-0
+racnode2-0          ClusterIP   None             &lt;none&gt;        &lt;none&gt;            16h   statefulset.kubernetes.io/pod-name=racnode2-0
+racnode2-0-lsnr     NodePort    10.102.225.198   &lt;none&gt;        31523:31523/TCP   16h   statefulset.kubernetes.io/pod-name=racnode2-0
+racnode2-0-ons      NodePort    10.108.138.93    &lt;none&gt;        6200:30201/TCP    16h   statefulset.kubernetes.io/pod-name=racnode2-0
+racnode2-0-vip      ClusterIP   None             &lt;none&gt;        &lt;none&gt;            16h   statefulset.kubernetes.io/pod-name=racnode2-0
+Exit code: 0
+
+$ kubectl -n rac get endpointslices -o wide
+NAME                      ADDRESSTYPE   PORTS     ENDPOINTS               AGE
+racnode-scan-lsnr-69b7l   IPv4          1521      10.244.1.9              16h
+racnode-scan-rdnd2        IPv4          &lt;unset&gt;   10.244.1.9,10.244.2.9   16h
+racnode1-0-g4fqn          IPv4          &lt;unset&gt;   10.244.1.9              16h
+racnode1-0-lsnr-4xgbj     IPv4          31522     10.244.1.9              16h
+racnode1-0-ons-m2bzz      IPv4          6200      10.244.1.9              16h
+racnode1-0-vip-vzq69      IPv4          &lt;unset&gt;   10.244.1.9              16h
+racnode2-0-bkhwr          IPv4          &lt;unset&gt;   10.244.2.9              16h
+racnode2-0-lsnr-2qfjx     IPv4          31523     10.244.2.9              16h
+racnode2-0-ons-lptmc      IPv4          6200      10.244.2.9              16h
+racnode2-0-vip-lt29w      IPv4          &lt;unset&gt;   10.244.2.9              16h
+Exit code: 0
+
+$ kubectl exec -n rac racnode1-0 -- ip -br address
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0@if14        UP             10.244.1.9/24 fe80::ef:c7ff:fe1b:4353/64
+ens1@if3         UP             192.168.78.120/24 169.254.13.148/20 fe80::4c23:e2ff:fea7:c48a/64
+ens2@if4         UP             192.168.79.120/24 169.254.31.123/20 fe80::2877:78ff:fe7e:4eb4/64
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+$ kubectl exec -n rac racnode1-0 -- ip route
+default via 10.244.1.1 dev eth0
+10.244.0.0/16 via 10.244.1.1 dev eth0
+10.244.1.0/24 dev eth0 proto kernel scope link src 10.244.1.9
+169.254.0.0/20 dev ens1 proto kernel scope link src 169.254.13.148
+169.254.16.0/20 dev ens2 proto kernel scope link src 169.254.31.123
+192.168.78.0/24 dev ens1 proto kernel scope link src 192.168.78.120
+192.168.79.0/24 dev ens2 proto kernel scope link src 192.168.79.120
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+$ kubectl exec -n rac racnode2-0 -- ip -br address
+lo               UNKNOWN        127.0.0.1/8 ::1/128
+eth0@if14        UP             10.244.2.9/24 fe80::1466:bdff:fecd:7ab3/64
+ens1@if3         UP             192.168.78.121/24 169.254.14.67/20 fe80::a0af:c0ff:fef6:58bd/64
+ens2@if4         UP             192.168.79.121/24 169.254.25.117/20 fe80::1425:d7ff:fe82:590d/64
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+$ kubectl exec -n rac racnode2-0 -- ip route
+default via 10.244.2.1 dev eth0
+10.244.0.0/16 via 10.244.2.1 dev eth0
+10.244.2.0/24 dev eth0 proto kernel scope link src 10.244.2.9
+169.254.0.0/20 dev ens1 proto kernel scope link src 169.254.14.67
+169.254.16.0/20 dev ens2 proto kernel scope link src 169.254.25.117
+192.168.78.0/24 dev ens1 proto kernel scope link src 192.168.78.121
+192.168.79.0/24 dev ens2 proto kernel scope link src 192.168.79.121
+Defaulted container &quot;racnode2-0&quot; out of: racnode2-0, racnode2-init1 (init)
+Exit code: 0
+
+SCENARIO C: persistent storage and GI restart prerequisites
+
+$ kubectl get pv
+NAME                     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                         STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+asm-pv-16e0716b-rac19c   49Gi       RWX            Retain           Bound    rac/asm-pvc-16e0716b-rac19c                  &lt;unset&gt;                          16h
+asm-pv-ee86c2c9-rac19c   49Gi       RWX            Retain           Bound    rac/asm-pvc-ee86c2c9-rac19c                  &lt;unset&gt;                          16h
+Exit code: 0
+
+$ kubectl -n rac get pvc
+NAME                      STATUS   VOLUME                   CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+asm-pvc-16e0716b-rac19c   Bound    asm-pv-16e0716b-rac19c   49Gi       RWX                           &lt;unset&gt;                 16h
+asm-pvc-ee86c2c9-rac19c   Bound    asm-pv-ee86c2c9-rac19c   49Gi       RWX                           &lt;unset&gt;                 16h
+Exit code: 0
+
+$ kubectl exec -n rac racnode1-0 -- df -hT /u01 /dev/shm
+Filesystem     Type   Size  Used Avail Use% Mounted on
+/dev/sdc       xfs    128G   53G   76G  41% /u01
+tmpfs          tmpfs   19G  1.4G   17G   8% /dev/shm
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+Exit code: 0
+
+$ kubectl exec -n rac racnode1-0 -- ls -ld /u01/app/grid/.etcoraclebackup /u01/app/grid/.etcoraclebackup/oracle /etc/oracle /u01/app/19c/grid /u01/app/oracle/product/19c/dbhome_1
+drwxr-xr-x.  6 root   oinstall  151 Oct 11 02:34 /etc/oracle
+drwxr-xr-x. 89 root   oinstall 4096 Oct 11 02:33 /u01/app/19c/grid
+drwxr-xr-x. 74 oracle oinstall 4096 Oct 11 14:19 /u01/app/oracle/product/19c/dbhome_1
+Defaulted container &quot;racnode1-0&quot; out of: racnode1-0, racnode1-init1 (init)
+ls: cannot access '/u01/app/grid/.etcoraclebackup': No such file or directory
+ls: cannot access '/u01/app/grid/.etcoraclebackup/oracle': No such file or directory
+command terminated with exit code 2
+Exit code: 2
+</code></pre>
+<p>Output presentation: tabs are expanded and trailing padding is removed; raw local logs remain unchanged.</p>
+</main></body></html>

@@ -2,7 +2,11 @@
 
 The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, including an ordered power cycle. The subsequent OCNE report completed at 22:10. This documentation was reconciled with those results on 8 October; that is a documentation review date, not a new live health check.
 
-Start with [Operating the lab](docs/OPERATING-LAB.md) for normal use. **Do not rerun VM creation, identity reset, formatting, or cluster installation on the completed lab.** RAC infrastructure and operator prerequisites were prepared on 9-10 October after recovering the foundation from host Modern Standby interruptions. RAC has not been provisioned. Start with the [RAC handoff](docs/RAC-PROVISIONING-HANDOFF.md), [provisioning YAML](config/rac-database.yaml), and [readiness evidence](docs/RAC-READINESS.md). The supplied slim image and 19.32 gold homes are now verified and staged on both workers; see [artifact acceptance](docs/RAC-ARTIFACT-ACCEPTANCE.md) for verification results and the user-confirmed DBCA fix decision. The user will apply the RAC manifest themselves.
+For a new manual build, start with the **[four-part OCNE-to-RAC manual](docs/OCNE-RAC-END-TO-END-MANUAL.md)** ([printable HTML](docs/OCNE-RAC-END-TO-END-MANUAL.html)). See the **[test scenario matrix: commands, expected versus actual results](docs/RAC-TEST-SCENARIO-MATRIX.md)**. The manual covers OCNE, Database Operator, RAC prerequisites/provisioning, and a [28-scenario operations workbook](docs/RAC-POD-EXERCISES.md) with full captured output and clearly labeled unexecuted exercises.
+
+For the existing lab, use [Operating the lab](docs/OPERATING-LAB.md) and [RAC deployment/acceptance](docs/RAC-DEPLOYMENT.md). RAC completed on 11 October: both instances OPEN, LABPDB READ WRITE, SGA 3 GiB, HugePages disabled, and SQL through both worker listeners verified. Controlled instance/service, cordon, sequential pod replacement and operator-restart exercises are now recorded. Both instances and SQL paths were healthy on 12 October at11:44UTC. Pod2 required assisted GI recovery; pod1 recovered with a duplicate-start image defect still logged. RMAN backup/read validation passed; actual restore and worker/full-lab failure recovery remain untested. **Do not rerun creation, identity resets or formatting.**
+
+Fresh builds use [rac-database.yaml](config/rac-database.yaml). The existing CR retains an immutable legacy service field and uses [rac-database-live.yaml](config/rac-database-live.yaml) for in-place reconciliation; its working application service is labpdb_app. The manual explains this difference and the stale operator connection summary.
 
 ## Architecture at a glance
 
@@ -44,12 +48,13 @@ flowchart TB
 
 Blue is the control plane; green marks the two workers; orange is the OCNE operator/NFS server. Arrows show logical management relationships, not a complete firewall or traffic map. The operator is a separate VM outside Kubernetes. The golden VM is retained as the original source.
 
-See [Architecture and data paths](docs/ARCHITECTURE.md) for SSH forwarding, storage layout and operating boundaries. These diagrams show the OCNE foundation and installed RAC prerequisites. Database Operator is installed; RAC remains unprovisioned.
+See [Architecture and data paths](docs/ARCHITECTURE.md) for SSH forwarding, storage layout and operating boundaries. These diagrams show the OCNE foundation and installed RAC prerequisites. Database Operator and RAC are installed; see the dated acceptance and recovery limits above.
 
 ## Documentation map
 
 | Document | Use |
 |---|---|
+| [End-to-end manual](docs/OCNE-RAC-END-TO-END-MANUAL.md) | Four ordered chapters with commands, diagrams, output and troubleshooting |
 | [Architecture and data paths](docs/ARCHITECTURE.md) | Visual VM topology, SSH forwarding and storage |
 | [Operating the lab](docs/OPERATING-LAB.md) | Access, startup, shutdown, health checks, storage and credential locations |
 | [SSH access](docs/SSH-ACCESS.md) | Windows hosts, NAT forwarding, guest mesh and pinned keys |
@@ -91,7 +96,7 @@ The Windows host reports 28 logical processors and 61.66 GiB visible physical RA
 
 All new lab VM disks are under this project. VirtualBox global registration and the existing golden VM retain their original Windows locations. Linux state, platform certificates and the Kubernetes administrator kubeconfig reside inside guests.
 
-The operator's separate 100 GiB NFS filesystem is mounted at `/srv/nfs`, exporting `/srv/nfs/share`. Clients mount `/mnt/ocne-share`; `labadmin` UID/GID 1001 has read/write access. Root squashing and SELinux remain enabled. No Kubernetes NFS PV/PVC or provisioner was added. Subsequent RAC preparation added shared ASM partitions and Database Operator; RAC itself remains unprovisioned.
+The operator's separate 100 GiB NFS filesystem is mounted at `/srv/nfs`, exporting `/srv/nfs/share`. Clients mount `/mnt/ocne-share`; `labadmin` UID/GID 1001 has read/write access. Root squashing and SELinux remain enabled. No Kubernetes NFS PV/PVC or provisioner was added. Subsequent RAC preparation added shared ASM partitions and Database Operator; RAC now uses the shared ASM disks; NFS remains separate.
 
 ## Build and maintenance boundaries
 
@@ -111,7 +116,7 @@ python .\scripts\Render-Documentation.py
 python .\scripts\Render-Documentation.py --check
 ```
 
-The renderer only writes the two guide HTML files. Its dependency is installed locally under ignored `private/`. Check mode validates source/HTML agreement, local Markdown links, balanced code fences, and stale project paths; it does not execute guest commands.
+The renderer writes the foundation guides, four-part manual, scenario workbook and captured-output HTML files. Manual SVG diagrams are local assets under docs/diagrams/. Its dependency is installed locally under ignored `private/`. Check mode validates source/HTML agreement, local Markdown links, balanced code fences, and stale project paths; it does not execute guest commands.
 
 ## Git and GitHub
 
