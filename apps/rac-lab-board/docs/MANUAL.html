@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RAC Lab Board - Complete Manual</title><style>body{margin:0;background:#eef3f3;color:#18313b;font:16px/1.65 system-ui,Segoe UI,sans-serif}main{max-width:1140px;margin:28px auto;padding:36px;background:white}h1,h2,h3{line-height:1.25;color:#164d43}h2{margin-top:2.2em;border-bottom:1px solid #bed4ce;padding-bottom:10px}a{color:#076c80}img{max-width:100%;height:auto}table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}td,th{border:1px solid #c8d7d8;padding:9px;vertical-align:top;overflow-wrap:anywhere}th{background:#174b43;color:white}tr:nth-child(even){background:#f3f7f7}pre{padding:18px;background:#122d36;color:#e8f5f0;overflow-x:auto;font:13px/1.55 Consolas,monospace}code{overflow-wrap:anywhere}pre code{white-space:pre;overflow-wrap:normal}nav{background:#f0f7f5;padding:20px}nav ul{padding-left:22px}.notice{border-left:4px solid #168879;padding:12px;background:#e8f5ef}@media(max-width:700px){main{padding:16px;margin:0}table{display:block;overflow:auto;table-layout:auto}}@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}nav{display:none}pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;color:black;background:#f4f6f6}h2,h3{break-after:avoid}tr,img{break-inside:avoid}}</style></head><body><main><p class="notice">Tested deployment: 13 October 2026. Main URL: <a href="http://localhost:8080">http://localhost:8080</a> while the workstation SSH tunnel is running. First installation and teardown commands change the lab; follow their stated scope.</p><nav><details><summary><strong>Contents - expand to jump to a step</strong></summary><div class="toc">
+<ul>
+<li><a href="#rac-lab-board-complete-illustrated-manual">RAC Lab Board: complete illustrated manual</a><ul>
+<li><a href="#before-you-start-requirements-and-execution-locations">Before you start: requirements and execution locations</a></li>
+<li><a href="#architecture-and-source-orientation">Architecture and source orientation</a></li>
+<li><a href="#prepare-workstation-dependencies-before-the-image-build-step">Prepare workstation dependencies before the image-build step</a></li>
+<li><a href="#1-read-only-preflight">1. Read-only preflight</a></li>
+<li><a href="#2-prepare-local-secrets-without-printing-them">2. Prepare local secrets without printing them</a></li>
+<li><a href="#3-create-the-two-application-schemas-once">3. Create the two application schemas once</a><ul>
+<li><a href="#noninteractive-alternative-used-for-this-deployment">Noninteractive alternative used for this deployment</a></li>
+</ul>
+</li>
+<li><a href="#4-build-and-stage-the-four-container-images">4. Build and stage the four container images</a><ul>
+<li><a href="#linux-podman-builder-used-in-this-lab">Linux Podman builder used in this lab</a></li>
+<li><a href="#docker-build-alternative-and-workstation-transfer">Docker build alternative and workstation transfer</a></li>
+</ul>
+</li>
+<li><a href="#5-create-the-namespace-and-the-two-secrets">5. Create the namespace and the two Secrets</a></li>
+<li><a href="#6-validate-and-apply-only-the-application">6. Validate and apply only the application</a></li>
+<li><a href="#7-access-through-ssh-and-verify-real-oracle-mode">7. Access through SSH and verify real Oracle mode</a></li>
+<li><a href="#8-acceptance-gate-before-fault-injection">8. Acceptance gate before fault injection</a></li>
+<li><a href="#9-troubleshooting">9. Troubleshooting</a></li>
+<li><a href="#10-follow-a-request-through-every-layer">10. Follow a request through every layer</a><ul>
+<li><a href="#10a-main-url-and-the-ssh-path">10a. Main URL and the SSH path</a></li>
+<li><a href="#10b-what-the-browser-should-show">10b. What the browser should show</a></li>
+<li><a href="#10c-routing-table">10c. Routing table</a></li>
+<li><a href="#10d-test-internal-connectivity-without-an-extra-diagnostic-image">10d. Test internal connectivity without an extra diagnostic image</a></li>
+<li><a href="#10e-what-each-kubernetes-object-does">10e. What each Kubernetes object does</a></li>
+<li><a href="#10f-how-database-connections-and-retries-work">10f. How database connections and retries work</a></li>
+</ul>
+</li>
+<li><a href="#11-hands-on-writes-and-application-pod-recovery">11. Hands-on writes and application pod recovery</a><ul>
+<li><a href="#11a-manual-writeretry-test">11a. Manual write/retry test</a></li>
+<li><a href="#11b-start-workloads-then-replace-one-pod">11b. Start workloads, then replace one pod</a></li>
+<li><a href="#11c-actual-results-and-limits">11c. Actual results and limits</a></li>
+</ul>
+</li>
+<li><a href="#12-stop-destroy-and-redeploy">12. Stop, destroy and redeploy</a><ul>
+<li><a href="#choose-the-result-you-want">Choose the result you want</a></li>
+<li><a href="#121-inspect-and-capture-before-changing-anything">12.1. Inspect and capture before changing anything</a></li>
+<li><a href="#122-pause-and-resume-alternative-to-uninstall">12.2. Pause and resume (alternative to uninstall)</a></li>
+<li><a href="#123-uninstall-the-application-preserving-records">12.3. Uninstall the application, preserving records</a></li>
+<li><a href="#124-redeploy-with-the-existing-records">12.4. Redeploy with the existing records</a></li>
+<li><a href="#125-optional-permanent-deletion-of-the-application-schemas">12.5. Optional permanent deletion of the application schemas</a></li>
+<li><a href="#126-close-the-workstation-tunnel">12.6. Close the workstation tunnel</a></li>
+<li><a href="#references">References</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</details></nav><h1 id="rac-lab-board-complete-illustrated-manual">RAC Lab Board: complete illustrated manual</h1>
+<p><strong>Deployed and verified on 13 October 2026.</strong> This manual explains the application from prerequisites to browser access, internal request flow, verification, troubleshooting and teardown. It assumes the OCNE cluster and Oracle RAC database already exist. For a new platform, first follow the <a href="../../../docs/OCNE-RAC-END-TO-END-MANUAL.md">OCNE/RAC end-to-end manual</a>.</p>
+<p><strong>Main URL: <a href="http://localhost:8080">http://localhost:8080</a></strong> on your workstation, while the SSH tunnel runs. This lab is already deployed: start at <strong>section 7</strong>, then section 10 to understand the request flow. Sections1-6 are for a first installation; do not rerun one-time credential/user creation against this running app. Section 12 explains how to uninstall and redeploy while preserving records.</p>
+<p>This document includes the full deployment and teardown procedures plus the internal-workings chapter. It is generated from those reviewed source documents by scripts/render_manual.py, so corrections can be kept consistent. <a href="DEPLOYMENT-RESULTS.md">Full actual results</a> include complete command transcripts, image digests, SQL output and per-scenario probe summaries. Actual and expected outputs are labelled; pod names, UIDs, timestamps and new-install ClusterIPs will differ next time.</p>
+<h2 id="before-you-start-requirements-and-execution-locations">Before you start: requirements and execution locations</h2>
+<table>
+<thead>
+<tr>
+<th>Location</th>
+<th>This lab</th>
+<th>Use it for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows workstation</td>
+<td>D:\OCNE19-Lab</td>
+<td>Source, protected files, SSH/SCP, browser and probes</td>
+</tr>
+<tr>
+<td>Operator</td>
+<td>ocne-op</td>
+<td>Existing rootless Podman builder</td>
+</tr>
+<tr>
+<td>Control plane</td>
+<td>ocne-cp  / 192.168.77.11</td>
+<td>Existing authorized kubectl context</td>
+</tr>
+<tr>
+<td>Worker1</td>
+<td>ocne-w1.lab.test  / 192.168.77.12</td>
+<td>Rootful image import; application pods and RACCDB1</td>
+</tr>
+<tr>
+<td>Worker2</td>
+<td>ocne-w2.lab.test  / 192.168.77.13</td>
+<td>Rootful image import; application pods and RACCDB2</td>
+</tr>
+<tr>
+<td>Application namespace</td>
+<td>rac-app</td>
+<td>Four Deployments/Services/PDBs, ConfigMap and two Secrets</td>
+</tr>
+<tr>
+<td>Database namespace</td>
+<td>rac</td>
+<td>Existing RAC resources; preserved by app teardown</td>
+</tr>
+<tr>
+<td>Oracle target</td>
+<td>LABPDB  / labpdb_app</td>
+<td>Separate LAB_TASKS and LAB_NOTES schemas</td>
+</tr>
+<tr>
+<td>Protected workstation files</td>
+<td>private/</td>
+<td>Credentials, tools, image archives, tunnel PID</td>
+</tr>
+<tr>
+<td>Raw evidence</td>
+<td>logs/</td>
+<td>Local command output and per-request JSONL</td>
+</tr>
+</tbody>
+</table>
+<p>Prerequisites: verified SSH aliases for all four VMs; existing kubectl access on ocne-cp; root/sudo access for image import on workers; both workers Ready and labelled raccluster=raccluster01; both RAC instances open; LABPDB READ WRITE; labpdb_app active on both instances; USERS online and AL32UTF8. First installation also requires unused LAB_TASKS/LAB_NOTES usernames and available NodePort 30080. Names already belonging to another project are investigated, never deleted to resolve conflicts.</p>
+<p>The application adds 325m CPU/512 MiB requested memory per worker,650m/1 GiB total. Inspect requests and actual usage before applying. Workers remain22 GiB each. OP/CP remain the user's 4/8 GiB, below Oracle minimum sizing; this app acceptance does not validate those platform choices.</p>
+<p><strong>Shell rule:</strong> PowerShell means your Windows workstation. A block labelled Bash on ocne-cp, operator or worker runs after SSH to that VM. Type exit to return to Windows before a workstation command. Linux workstation examples use the checkout's actual path and python3; Git Bash on this Windows host uses /d/OCNE19-Lab and may name the interpreter python. Choose one alternative for each creation step, not both.</p>
+<p>If adapting to your own environment, map your actual SSH aliases, node labels, PDB/service, listener DNS names/ports, namespace, tablespace and NodePort first. Update YAML, SQL and commands consistently. lab.psd1 does not dynamically rewrite these app files or a live cluster. There are no VM creation, disk formatting or RAC provisioning commands in the application procedure.</p>
+<h2 id="architecture-and-source-orientation">Architecture and source orientation</h2>
+<p><img alt="Deployed architecture" src="diagrams/architecture.svg" /></p>
+<p>The browser loads HTML/CSS/JavaScript from the frontend. Frontend proxies same-origin /api requests to Node.js. Node routes tasks to Python and notes to Java. Each database service has its own account/table in the same Oracle PDB. RAC's two instances access the same database; an acknowledged record is not tied to its original app pod or Oracle instance.</p>
+<table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>Contents</th>
+<th>Runtime responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>frontend/public</td>
+<td>HTML/CSS/browser JavaScript</td>
+<td>Forms, lists, health, saved retry UUID</td>
+</tr>
+<tr>
+<td>frontend/server.mjs</td>
+<td>Node static server/proxy</td>
+<td>Port 8080, routes /api to gateway</td>
+</tr>
+<tr>
+<td>backend/node-gateway</td>
+<td>Node HTTP router</td>
+<td>Port 8081, routing and aggregated health</td>
+</tr>
+<tr>
+<td>backend/python-tasks</td>
+<td>Python HTTP API and Oracle Thin pool</td>
+<td>Port 8082, LAB_TASKS.BOARD_TASKS</td>
+</tr>
+<tr>
+<td>backend/java-notes/src</td>
+<td>Java HTTP API, JDBC Thin / HikariCP</td>
+<td>Port 8083, LAB_NOTES.BOARD_NOTES</td>
+</tr>
+<tr>
+<td>database</td>
+<td>Create, verify and optional drop SQL</td>
+<td>Administrator-only schema lifecycle</td>
+</tr>
+<tr>
+<td>kubernetes</td>
+<td>Namespace, ConfigMap, workloads and Services</td>
+<td>Two replicas per component</td>
+</tr>
+<tr>
+<td>scripts</td>
+<td>Individually invoked helpers</td>
+<td>Build, credentials, verification, pod tests, teardown</td>
+</tr>
+</tbody>
+</table>
+<p>No Oracle Instant Client is needed. Runtime users do not receive DBA privileges. Containers run as UID/GID 10001 with read-only root filesystems, dropped capabilities, no service-account token and a small disk-backed /tmp. Each Python/Java replica allows at most two Oracle connections; eight total across those four replicas. Java heap is capped at 128 MiB. See <a href="ARCHITECTURE.md">ARCHITECTURE.md</a> for the full resource/timeout table.</p>
+<p>This is an unauthenticated learning app for the isolated lab. The SSH tunnel listens only on workstation loopback, but it does not make the underlying cluster NodePort private. Do not expose the app publicly.</p>
+<h2 id="prepare-workstation-dependencies-before-the-image-build-step">Prepare workstation dependencies before the image-build step</h2>
+<p>The running lab already has these dependencies. On a new Windows checkout, from PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab\apps\rac-lab-board
+node --version
+python --version
+# Only if JDK21 is not already installed:
+.\scripts\Install-Local-JDK.ps1
+python scripts/prepare.py
+if ($LASTEXITCODE -ne 0) { throw 'Dependency preparation failed' }
+</code></pre>
+<p>Expected: Node.js 24, Python 3.10+, Java 21; five Java jars match their locked hashes; Java compiles; pinned Python packages install in the private virtual environment. Actual runtime packages include python-oracledb3.4.2, ojdbc11 23.9.0.25.07, HikariCP5.1.0, Gson2.13.2 and SLF4J2.0.17. Containers use Linux Python 3.12 and Java 21; all four image builds passed.</p>
+<p>Equivalent Bash workstation, with Node.js 24/Python 3.10+/JDK 21 already installed:</p>
+<pre><code class="language-bash">cd /path/to/OCNE19-Lab/apps/rac-lab-board
+node --version
+python3 --version
+javac -version
+python3 scripts/prepare.py
+</code></pre>
+<p>Do not run scripts/dev.py for the live deployment. That is a separate memory-only demonstration, and its port 8080 conflicts with the live SSH tunnel. <a href="LOCAL-DEVELOPMENT.md">LOCAL-DEVELOPMENT.md</a> explains that optional mode.</p>
+<p>This chapter changes the live lab when you run it. The user authorized deployment on 13 October 2026. See <a href="DEPLOYMENT-RESULTS.md">deployment evidence</a> for actual results and <a href="DESTROY.md">teardown/redeployment</a> for removal commands. It is a manual procedure, not an auto-run installer. Finish the preflight, schemas and image checks before creating app pods. Use the existing lab; do not rerun VM creation, OS cloning, RAC provisioning or disk formatting.</p>
+<h2 id="1-read-only-preflight">1. Read-only preflight</h2>
+<p>From Windows PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+ssh ocne-cp
+</code></pre>
+<p>The following commands run in <strong>Bash on ocne-cp</strong>, using its existing authorized kubectl context:</p>
+<pre><code class="language-bash">set -euo pipefail
+kubectl config current-context
+kubectl get nodes -o wide
+kubectl get nodes -l raccluster=raccluster01 -o wide
+kubectl -n rac get pods -o wide
+kubectl -n rac get services racnode1-0-lsnr racnode2-0-lsnr
+kubectl get services -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,NODEPORT:.spec.ports[*].nodePort
+kubectl describe node ocne-w1.lab.test
+kubectl describe node ocne-w2.lab.test
+kubectl -n rac exec racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status database -db RACCDB'
+kubectl -n rac exec racnode1-0 -- su - oracle -c '/u01/app/oracle/product/19c/dbhome_1/bin/srvctl status service -db RACCDB -service labpdb_app'
+</code></pre>
+<p>Expected: both workers Ready, worker label on both, both RAC instances running, application service running on both, and listener Services exposing 31522 and 31523. Port 30080 must be unused, or already owned by this exact app on a subsequent run. If another project uses it, choose a free NodePort and consistently update the frontend manifest and SSH commands. Do not delete conflicting resources.</p>
+<p>Confirm one replica of each service's additional 325m CPU / 512 MiB memory fits <strong>each</strong> worker's current requests. Inspect actual host/container use and disk space too. Requests are scheduling reservations, not spare physical RAM. Reassess admission after every material lab change. The existing single control plane and undersized OP/CP are lab limitations. Keep workers at 22 GiB unless separately changed by the user.</p>
+<p>Check that <code>rac-app</code>, the four board Deployments, and LAB_TASKS/LAB_NOTES do not belong to another project. If a partial earlier run exists, inspect it and continue the missing steps. Never use delete/recreate as a naming-conflict remedy.</p>
+<h2 id="2-prepare-local-secrets-without-printing-them">2. Prepare local secrets without printing them</h2>
+<p>On Windows, from the app root:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab\apps\rac-lab-board
+python scripts/make_secrets.py
+if ($LASTEXITCODE -ne 0) { throw 'Secret preparation failed' }
+</code></pre>
+<p>Equivalent Bash from the app root:</p>
+<pre><code class="language-bash">python3 scripts/make_secrets.py
+</code></pre>
+<p>This creates four files in the project's ignored <code>private/rac-app-secrets</code>: tasks/notes username and password files. Usernames are LAB_TASKS and LAB_NOTES; passwords are different 30-character random lowercase hexadecimal strings. There are no newline bytes in these files. The helper restricts the directory ACL on Windows or uses mode 0700/0600 on POSIX. It refuses to overwrite an existing directory. It was run during the authorized deployment. Oracle 19c passwords are limited to 30 bytes; the original 32-character generator failed with ORA-00972 and was corrected before either user existed. See <a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/dbseg/minimum-requirements-passwords.html">Oracle password requirements</a>.</p>
+<p>Do not put passwords into YAML, environment-example files, shell history or source control. Reuse these exact passwords at the Oracle prompts and when creating Kubernetes Secrets. Password rotation later requires a coordinated database change, Secret update and controlled app rollout; changing the Secret alone does not change an Oracle password or existing process environment.</p>
+<h2 id="3-create-the-two-application-schemas-once">3. Create the two application schemas once</h2>
+<p>Inspect the SQL first: <a href="../database/01-create-schemas.sql">01-create-schemas.sql</a>. It targets LABPDB, requires AL32UTF8 and an existing online USERS tablespace, rejects pre-existing app users, grants only CREATE SESSION, and caps each user's quota at 100 MiB. It does not create a tablespace or format/attach storage. An administrator creates the tables and indexes in the two schemas; runtime services do not migrate schema.</p>
+<p>Windows PowerShell, app root:</p>
+<pre><code class="language-powershell">ssh ocne-cp 'mkdir -p ~/rac-app/database ~/rac-app/kubernetes'
+scp database/01-create-schemas.sql database/02-verify.sql ocne-cp:rac-app/database/
+scp kubernetes/00-namespace.yaml kubernetes/10-config.yaml kubernetes/20-workloads.yaml kubernetes/kustomization.yaml ocne-cp:rac-app/kubernetes/
+</code></pre>
+<p>The same <code>ssh</code> and <code>scp</code> commands work from Bash in the app root. For a different environment, adjust this known lab's SSH alias, PDB/service/listener addresses, worker selector, usernames and tablespace <strong>together</strong>, based on observed state. The configuration here does not dynamically rewrite an existing cluster.</p>
+<p>On ocne-cp:</p>
+<pre><code class="language-bash">kubectl cp &quot;$HOME/rac-app/database/01-create-schemas.sql&quot; rac/racnode1-0:/tmp/rac-board-create-schemas.sql
+kubectl exec -it -n rac racnode1-0 -- su - oracle -c 'ORACLE_SID=RACCDB1 /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -L / as sysdba @/tmp/rac-board-create-schemas.sql'
+</code></pre>
+<p>At each hidden ACCEPT prompt, paste the corresponding protected file's password, not the file path. Do not enable SQL echo/spooling. On Windows you can copy one value into the clipboard without printing it:</p>
+<pre><code class="language-powershell">Get-Content -Raw D:\OCNE19-Lab\private\rac-app-secrets\tasks-password.txt | Set-Clipboard
+# Paste only into the LAB_TASKS hidden SQL prompt.
+Get-Content -Raw D:\OCNE19-Lab\private\rac-app-secrets\notes-password.txt | Set-Clipboard
+# Paste only into the LAB_NOTES hidden SQL prompt, then clear the clipboard.
+Set-Clipboard -Value ''
+</code></pre>
+<p>On a Linux graphical workstation, use your protected password manager/file viewer, or <code>xclip -selection clipboard -i ../../private/rac-app-secrets/tasks-password.txt</code> from the app root if xclip is installed; repeat for notes, then <code>printf '' | xclip -selection clipboard</code>. This manual route uses interactive password entry. Do not paste a password into a shell command. The scripts accept exactly the generated hexadecimal format, avoiding SQL quoting ambiguity.</p>
+<p>Expected final SQL rows: <code>LAB_NOTES BOARD_NOTES</code> and <code>LAB_TASKS BOARD_TASKS</code>. Oracle DDL auto-commits; failure halfway through can leave some objects created. Inspect <code>dba_users</code>, <code>dba_tables</code>, indexes and grants, and execute only missing DDL. Do not blindly rerun the create-users script or drop existing application records.</p>
+<p>Verify on ocne-cp:</p>
+<pre><code class="language-bash">kubectl cp &quot;$HOME/rac-app/database/02-verify.sql&quot; rac/racnode1-0:/tmp/rac-board-verify.sql
+kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'ORACLE_SID=RACCDB1 /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -L -s / as sysdba @/tmp/rac-board-verify.sql'
+</code></pre>
+<p>Expected: LABPDB, two tables, zero initial records, OPEN user accounts, CREATE SESSION grants and labpdb_app active on both instances. Application writes are verified after deployment, not by inserting dummy administrator-owned data now.</p>
+<h3 id="noninteractive-alternative-used-for-this-deployment">Noninteractive alternative used for this deployment</h3>
+<p>The reviewed helper reads the protected files locally, validates the usernames and 30-character hexadecimal passwords, and sends SQL or Secret JSON through encrypted SSH standard input. It does not place passwords in command arguments or print them. SQL errors are redacted before output. It uses the existing authorized ocne-cp SSH alias and OS SYSDBA access inside racnode1-0.</p>
+<p>From the Windows app root:</p>
+<pre><code class="language-powershell">python scripts/provision_access.py create-schemas
+if ($LASTEXITCODE -ne 0) { throw 'Inspect partial schema state before retrying' }
+python scripts/provision_access.py verify
+</code></pre>
+<p>Bash workstation equivalent:</p>
+<pre><code class="language-bash">python3 scripts/provision_access.py create-schemas
+python3 scripts/provision_access.py verify
+</code></pre>
+<p>Choose either this method or the interactive method above for schema creation, not both. Existing users cause creation to stop deliberately. After section 5 creates the namespace, <code>python scripts/provision_access.py create-secrets</code> (Bash: <code>python3</code>) creates the two Secrets directly from protected local files without transferring plaintext files to the guest. Choose this helper or section 5's manual Secret commands, not both. A partial Secret creation is inspected and completed individually, never silently overwritten.</p>
+<h2 id="4-build-and-stage-the-four-container-images">4. Build and stage the four container images</h2>
+<h3 id="linux-podman-builder-used-in-this-lab">Linux Podman builder used in this lab</h3>
+<p>Docker Desktop was stopped. The existing operator VM had rootless Podman 5.8.2, SELinux enabled, cgroup v2, about 2.2 GiB available RAM and 82 GiB free root-disk space. We built sequentially there with a 1 GiB build-memory limit. This is our local build implementation, not an OCNE installation requirement. Base images use explicit docker.io/library names to avoid ambiguous short-name registry lookup.</p>
+<p>Prepare locked Java jars first using the local-development instructions. Transfer only app build contexts and scripts, including ignored Java lib jars, excluding secrets, node_modules, build output and logs. From the Windows app root:</p>
+<pre><code class="language-powershell">python scripts/package_build.py
+scp ../../private/rac-app-source-1.0.0.tar.gz ocne-op:rac-app-source-1.0.0.tar.gz
+ssh ocne-op
+</code></pre>
+<p>Bash workstation equivalent:</p>
+<pre><code class="language-bash">python3 scripts/package_build.py
+scp ../../private/rac-app-source-1.0.0.tar.gz ocne-op:rac-app-source-1.0.0.tar.gz
+ssh ocne-op
+</code></pre>
+<p>On the operator, <strong>first build only</strong> (the directory already exists after this deployment):</p>
+<pre><code class="language-bash">set -euo pipefail
+podman info
+free -m
+df -h &quot;$HOME&quot;
+test ! -e &quot;$HOME/rac-app-build&quot;
+mkdir &quot;$HOME/rac-app-build&quot;
+tar -xzf &quot;$HOME/rac-app-source-1.0.0.tar.gz&quot; -C &quot;$HOME/rac-app-build&quot;
+python3 &quot;$HOME/rac-app-build/scripts/build_images.py&quot; --engine podman --archive &quot;$HOME/rac-app-images-1.0.0.tar&quot;
+sha256sum &quot;$HOME/rac-app-images-1.0.0.tar&quot;
+</code></pre>
+<p>The helper verifies all locked Java jars, builds linux/amd64 images, and exports a multi-image docker archive. For later code changes, choose a new version tag, directory and archive, update all four manifest tags consistently, and retain the previous version for rollback. Do not overwrite a deployed tag and assume running pods changed. For redeployment of this unchanged version, reuse the verified images/archive.</p>
+<p>Because workstation NAT-forwarded transfer was slow, the actual worker transfer used the existing verified inter-VM SSH connections, from the operator:</p>
+<pre><code class="language-bash">scp -C -o BatchMode=yes -o StrictHostKeyChecking=yes &quot;$HOME/rac-app-images-1.0.0.tar&quot; labadmin@ocne-w1:rac-app-images-1.0.0.tar
+scp -C -o BatchMode=yes -o StrictHostKeyChecking=yes &quot;$HOME/rac-app-images-1.0.0.tar&quot; labadmin@ocne-w2:rac-app-images-1.0.0.tar
+</code></pre>
+<p>Keep a workstation copy under private/ too. Worker import remains <strong>rootful</strong>, as described below. Sources: <a href="https://docs.podman.io/en/latest/markdown/podman-build.1.html">Podman build</a>, <a href="https://docs.podman.io/en/latest/markdown/podman-save.1.html">multi-image save</a>, <a href="https://docs.podman.io/en/latest/markdown/podman-load.1.html">load</a>.</p>
+<h3 id="docker-build-alternative-and-workstation-transfer">Docker build alternative and workstation transfer</h3>
+<p>Follow <a href="LOCAL-DEVELOPMENT.md">local build instructions</a>. After a successful build/export on Windows:</p>
+<pre><code class="language-powershell">Get-FileHash D:\OCNE19-Lab\private\rac-app-images-1.0.0.tar -Algorithm SHA256
+scp D:\OCNE19-Lab\private\rac-app-images-1.0.0.tar ocne-w1:rac-app-images-1.0.0.tar
+scp D:\OCNE19-Lab\private\rac-app-images-1.0.0.tar ocne-w2:rac-app-images-1.0.0.tar
+ssh ocne-w1
+</code></pre>
+<p>Bash workstation equivalent, app root:</p>
+<pre><code class="language-bash">sha256sum ../../private/rac-app-images-1.0.0.tar
+scp ../../private/rac-app-images-1.0.0.tar ocne-w1:rac-app-images-1.0.0.tar
+scp ../../private/rac-app-images-1.0.0.tar ocne-w2:rac-app-images-1.0.0.tar
+ssh ocne-w1
+</code></pre>
+<p>On <strong>each worker separately</strong>, first inspect the tool/runtime/storage state:</p>
+<pre><code class="language-bash">command -v podman
+command -v crictl
+df -h &quot;$HOME&quot; /var/lib/containers/storage
+sha256sum &quot;$HOME/rac-app-images-1.0.0.tar&quot;
+sudo podman info --format '{{.Store.GraphRoot}}'
+sudo crictl info
+</code></pre>
+<p>Compare the archive hash with the workstation. Do not import a different archive or invent a new CRI-O storage path. With the existing rootful container-storage tooling available:</p>
+<pre><code class="language-bash">sudo podman load --input &quot;$HOME/rac-app-images-1.0.0.tar&quot;
+sudo crictl images | grep rac-board
+</code></pre>
+<p>Expected: all four exact <code>localhost/rac-board-*:1.0.0</code> tags visible through <strong>crictl on both workers</strong>. A rootless Podman import is not sufficient. If Podman is missing, or CRI-O cannot see those tags, stop and resolve the observed tooling/storage mismatch before applying Deployments. See the deployment evidence for the actual imports. Do not install Docker or alter CRI-O just to bypass the check.</p>
+<p>Record image IDs and build/base-image digests with the deployment evidence. Dockerfile tags can move; rebuilds are not assumed bit-for-bit identical.</p>
+<h2 id="5-create-the-namespace-and-the-two-secrets">5. Create the namespace and the two Secrets</h2>
+<p>On ocne-cp, after reviewing the copied files:</p>
+<pre><code class="language-bash">kubectl apply --dry-run=client -f &quot;$HOME/rac-app/kubernetes/00-namespace.yaml&quot;
+kubectl apply -f &quot;$HOME/rac-app/kubernetes/00-namespace.yaml&quot;
+mkdir -p &quot;$HOME/private/rac-app-secrets&quot;
+chmod 700 &quot;$HOME/private/rac-app-secrets&quot;
+</code></pre>
+<p>From PowerShell, transfer the four individual secret files over SSH:</p>
+<pre><code class="language-powershell">scp D:\OCNE19-Lab\private\rac-app-secrets\tasks-username.txt D:\OCNE19-Lab\private\rac-app-secrets\tasks-password.txt D:\OCNE19-Lab\private\rac-app-secrets\notes-username.txt D:\OCNE19-Lab\private\rac-app-secrets\notes-password.txt ocne-cp:private/rac-app-secrets/
+</code></pre>
+<p>Bash workstation equivalent from app root:</p>
+<pre><code class="language-bash">scp ../../private/rac-app-secrets/tasks-username.txt ../../private/rac-app-secrets/tasks-password.txt ../../private/rac-app-secrets/notes-username.txt ../../private/rac-app-secrets/notes-password.txt ocne-cp:private/rac-app-secrets/
+</code></pre>
+<p>On ocne-cp, passwords remain out of command-line arguments and printed output:</p>
+<pre><code class="language-bash">chmod 600 &quot;$HOME/private/rac-app-secrets/&quot;*.txt
+kubectl -n rac-app create secret generic board-tasks-db \
+  --from-file=username=&quot;$HOME/private/rac-app-secrets/tasks-username.txt&quot; \
+  --from-file=password=&quot;$HOME/private/rac-app-secrets/tasks-password.txt&quot;
+kubectl -n rac-app create secret generic board-notes-db \
+  --from-file=username=&quot;$HOME/private/rac-app-secrets/notes-username.txt&quot; \
+  --from-file=password=&quot;$HOME/private/rac-app-secrets/notes-password.txt&quot;
+kubectl -n rac-app label secret board-tasks-db board-notes-db app.kubernetes.io/part-of=rac-lab-board
+kubectl -n rac-app get secret board-tasks-db board-notes-db
+</code></pre>
+<p>Expected: two Opaque Secrets with two data entries each. Do not use <code>-o yaml</code> or decode them into a transcript. If already present, inspect ownership and intended credentials; do not delete/recreate automatically. Protect or remove the <strong>specific temporary transferred files</strong> according to your credential handling procedure after verification, retaining the protected master copies needed for recovery. No generic recursive cleanup command is provided.</p>
+<h2 id="6-validate-and-apply-only-the-application">6. Validate and apply only the application</h2>
+<p>On ocne-cp:</p>
+<pre><code class="language-bash">kubectl apply --dry-run=server -k &quot;$HOME/rac-app/kubernetes&quot;
+# Review all names/namespaces/images; this next command actually deploys the app.
+kubectl apply -k &quot;$HOME/rac-app/kubernetes&quot;
+for name in board-frontend board-gateway board-tasks board-notes; do
+  kubectl -n rac-app rollout status &quot;deployment/$name&quot; --timeout=180s
+done
+kubectl -n rac-app get deployments,pods,services,pdb -o wide
+kubectl -n rac-app get endpointslices -l kubernetes.io/service-name=board-tasks
+kubectl -n rac-app get endpointslices -l kubernetes.io/service-name=board-notes
+</code></pre>
+<p>Expected: four Deployments with 2/2 available, eight Ready pods, four Services, four PDBs with one allowed disruption under healthy conditions, and two ready backend endpoints per backend. If all replicas of a service landed on one worker, inspect scheduling/resources; the spread preference is not a guarantee. Do not force a worker drain to fix placement in this RAC lab.</p>
+<p>If rollout fails, use <a href="#9-troubleshooting">troubleshooting below</a>. Never treat a Ready RAC TCP probe as proof of SQL availability. The new backend probes execute SQL; their failures can reveal an existing database/service/schema issue.</p>
+<h2 id="7-access-through-ssh-and-verify-real-oracle-mode">7. Access through SSH and verify real Oracle mode</h2>
+<p>From Windows PowerShell or Bash on the workstation, keep this session running:</p>
+<pre><code class="language-text">ssh -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -N -L 127.0.0.1:8080:192.168.77.12:30080 ocne-cp
+</code></pre>
+<p>Use http://localhost:8080. The tunnel goes through the existing SSH alias/NAT forwarding and targets the frontend <strong>Service</strong> via a worker NodePort. A normal frontend pod replacement should not bind the tunnel to the old pod. <code>kubectl port-forward deployment/...</code> can be convenient for diagnostics, but its chosen pod connection can end during a pod-replacement test, confounding the result.</p>
+<p>For maintenance of worker1, use worker2 as the tunnel destination: <code>ssh -N -L 127.0.0.1:8080:192.168.77.13:30080 ocne-cp</code> after stopping the old tunnel. A tunnel whose fixed destination is powered off will fail independently of app health.</p>
+<p>PowerShell verification:</p>
+<pre><code class="language-powershell">Invoke-RestMethod http://localhost:8080/api/status | ConvertTo-Json -Depth 8
+$task = @{id=[guid]::NewGuid().ToString();text='First real RAC task'} | ConvertTo-Json -Compress
+Invoke-RestMethod http://localhost:8080/api/tasks -Method Post -ContentType application/json -Body $task | ConvertTo-Json -Depth 8
+Invoke-RestMethod http://localhost:8080/api/tasks -Method Post -ContentType application/json -Body $task | ConvertTo-Json -Depth 8
+$note = @{id=[guid]::NewGuid().ToString();text='Java also writes to LABPDB'} | ConvertTo-Json -Compress
+Invoke-RestMethod http://localhost:8080/api/notes -Method Post -ContentType application/json -Body $note | ConvertTo-Json -Depth 8
+</code></pre>
+<p>Bash equivalent:</p>
+<pre><code class="language-bash">curl --fail-with-body -sS http://localhost:8080/api/status | python3 -m json.tool
+task=$(python3 -c 'import json,uuid; print(json.dumps({&quot;id&quot;:str(uuid.uuid4()),&quot;text&quot;:&quot;First real RAC task&quot;}))')
+curl --fail-with-body -sS http://localhost:8080/api/tasks -H 'Content-Type: application/json' -d &quot;$task&quot;
+curl --fail-with-body -sS http://localhost:8080/api/tasks -H 'Content-Type: application/json' -d &quot;$task&quot;
+note=$(python3 -c 'import json,uuid; print(json.dumps({&quot;id&quot;:str(uuid.uuid4()),&quot;text&quot;:&quot;Java also writes to LABPDB&quot;}))')
+curl --fail-with-body -sS http://localhost:8080/api/notes -H 'Content-Type: application/json' -d &quot;$note&quot;
+</code></pre>
+<p>Expected: <code>mode=oracle</code>, <code>pdb=LABPDB</code>, real RACCDB1/RACCDB2 names, one created task followed by <code>deduplicated=true</code>, and one created note. A connection pool can remain on the same instance for multiple calls; a 50/50 split is not promised. Verify each language can recover through either listener during the controlled scenarios. Repeat the SQL verification from section 3; counts and unique IDs should agree.</p>
+<h2 id="8-acceptance-gate-before-fault-injection">8. Acceptance gate before fault injection</h2>
+<p>Capture the context, nodes, resource reservations, pod UIDs/placement, image IDs, both SQL paths, app status and test record IDs. Ensure current database backup/recovery readiness and a maintenance window. Run the no-fault HTTP probe first. Only then follow <a href="FAILOVER.md">FAILOVER.md</a>, starting with app pods. Do not combine multiple faults; restore and verify after each one.</p>
+<h2 id="9-troubleshooting">9. Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Check</th>
+<th>Corrective action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ErrImageNeverPull</td>
+<td><code>kubectl -n rac-app describe pod &lt;name&gt;</code>; <code>sudo crictl images</code> on its worker</td>
+<td>Load exact image/tag into rootful CRI-O-visible storage on both workers</td>
+</tr>
+<tr>
+<td>CreateContainerConfigError</td>
+<td>Pod events, Secret/ConfigMap names (without printing values)</td>
+<td>Create the missing app-only prerequisite; verify key names</td>
+</tr>
+<tr>
+<td>Pending</td>
+<td><code>kubectl -n rac-app describe pod &lt;name&gt;</code>; worker labels and requests</td>
+<td>Fix label substitution or capacity after inspection; do not evict RAC or increase worker RAM silently</td>
+</tr>
+<tr>
+<td>Python/Java live but not ready</td>
+<td>Backend logs and <code>/api/status</code>; listener Services, PDB, schema</td>
+<td>Correct the actual DB service, user/password, account state or missing tables; no blind schema reset</td>
+</tr>
+<tr>
+<td>ORA-01017 / ORA-28000</td>
+<td>Restricted operator investigation; application log deliberately suppresses raw driver details</td>
+<td>Match Secret to the intended Oracle user; investigate account locking instead of repeated bad logins</td>
+</tr>
+<tr>
+<td>ORA-00942</td>
+<td>Run the read-only schema verification SQL</td>
+<td>Finish missing schema objects using the correct owner; do not grant DBA</td>
+</tr>
+<tr>
+<td>TCP works but database service unavailable</td>
+<td><code>srvctl status service</code>; SQL to LABPDB</td>
+<td>Restore registered application service/instance; TCP alone is insufficient</td>
+</tr>
+<tr>
+<td>Browser shows LOCAL DEMO</td>
+<td>ConfigMap and Deployment env</td>
+<td>Stop acceptance: Kubernetes must use Oracle mode; do not claim data persistence</td>
+</tr>
+<tr>
+<td>Browser shows 503 while only one backend fails</td>
+<td>Status for tasks vs notes, gateway logs</td>
+<td>Diagnose that backend independently; the other service should remain usable</td>
+</tr>
+<tr>
+<td>Unknown write outcome</td>
+<td>Saved request ID/body and exact-ID GET</td>
+<td>Retry identical payload; never invent a new ID to hide ambiguity</td>
+</tr>
+<tr>
+<td>OOMKilled or repeated Java restarts</td>
+<td><code>kubectl describe pod</code>, previous logs, current resources</td>
+<td>Measure workload/heap/native memory and available worker headroom before tuning</td>
+</tr>
+<tr>
+<td>UI unavailable after frontend pod delete</td>
+<td>Whether access used pod-pinned port-forward</td>
+<td>Reconnect or use the documented worker NodePort SSH tunnel</td>
+</tr>
+</tbody>
+</table>
+<p>Useful Bash commands on ocne-cp:</p>
+<pre><code class="language-bash">kubectl -n rac-app get pods -o wide
+kubectl -n rac-app get events --sort-by=.lastTimestamp
+kubectl -n rac-app logs -l app.kubernetes.io/name=board-tasks --prefix --tail=100
+kubectl -n rac-app logs -l app.kubernetes.io/name=board-notes --prefix --tail=100
+kubectl -n rac-app logs -l app.kubernetes.io/name=board-gateway --prefix --tail=100
+</code></pre>
+<p>Use <code>kubectl logs &lt;pod&gt; --previous</code> for a container restart. Keep raw logs in the project's ignored <code>logs/</code>; sanitize evidence before adding it to documentation. These commands apply to the deployed application. Read the evidence before treating any fault scenario as executed.</p>
+<p>This chapter is also included in the <a href="MANUAL.md">complete manual</a>. Commands marked Bash on ocne-cp use its existing kubectl context. Workstation Python commands run from the app root; use python3 in Bash. Read-only inspections are distinguished from tests that write records or replace app pods.</p>
+<h2 id="10-follow-a-request-through-every-layer">10. Follow a request through every layer</h2>
+<h3 id="10a-main-url-and-the-ssh-path">10a. Main URL and the SSH path</h3>
+<p><strong>Main application: <a href="http://localhost:8080">http://localhost:8080</a></strong>. In this deployment a hidden SSH tunnel already runs. After a workstation reboot or closed SSH session, reopen it from a dedicated PowerShell or Bash workstation terminal:</p>
+<pre><code class="language-text">ssh -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -N -L 127.0.0.1:8080:192.168.77.12:30080 ocne-cp
+</code></pre>
+<p>Success is normally silent; leave the terminal open. This means:</p>
+<ol>
+<li>Browser connects to 127.0.0.1:8080 on Windows.</li>
+<li>SSH encrypts the connection to the existing ocne-cp SSH endpoint.</li>
+<li>From inside the guest network, ocne-cp connects to worker1 at192.168.77.12:30080.</li>
+<li>Kubernetes NodePort routes to a Ready frontend pod, possibly on either worker.</li>
+</ol>
+<p>-N runs no remote command; -L forwards the local port. ExitOnForwardFailure catches bind errors, and ServerAliveInterval detects broken SSH connectivity. The tunnel targets a Service via a worker address, not a specific frontend pod. App-pod replacement therefore does not require retargeting it. If worker1 itself is unavailable, use 192.168.77.13 after verifying worker2 and stopping the previous tunnel. Do not bind two tunnels to the same localhost port.</p>
+<p>If port 8080 is already used, inspect it before stopping anything. PowerShell:</p>
+<pre><code class="language-powershell">Get-NetTCPConnection -State Listen -LocalPort 8080 | Select-Object LocalAddress,OwningProcess
+$status = Invoke-RestMethod http://127.0.0.1:8080/api/status
+$status | ConvertTo-Json -Depth 8
+if (-not $status.services.tasks.healthy -or -not $status.services.notes.healthy) { throw 'A backend is unhealthy' }
+if ($status.services.tasks.mode -ne 'oracle' -or $status.services.notes.mode -ne 'oracle') { throw 'Not in Oracle mode' }
+</code></pre>
+<p>Bash workstation:</p>
+<pre><code class="language-bash">ss -ltnp 'sport = :8080'
+curl --fail-with-body -sS http://127.0.0.1:8080/api/status | python3 -m json.tool
+</code></pre>
+<p>A closed workstation tunnel does not stop the cluster app. Reopen it before redeploying anything. The hidden tunnel PID is recorded in private/rac-app-tunnel.json; verify the actual process before stopping it, because PIDs can be reused.</p>
+<h3 id="10b-what-the-browser-should-show">10b. What the browser should show</h3>
+<p>Open localhost:8080. The health card should say <strong>All services reachable</strong>, the banner <strong>ORACLE MODE</strong>, and both panels Ready. Add a task and a note, then refresh: both remain because Oracle stores them. The panel footers identify the gateway/backend pod and RACCDB1 or RACCDB2. Pool reuse means an instance can appear repeatedly; 50/50 routing is not promised.</p>
+<p><img alt="Actual Oracle-mode browser capture" src="diagrams/application-live.png" /></p>
+<p>Live mobile-size capture from the same acceptance:</p>
+<p><img src="diagrams/application-live-mobile.png" alt="Live app at a 390-pixel mobile viewport" width="390"></p>
+<p>/api/status is JSON health, not a second UI. It can return HTTP 200 while a backend is unhealthy: inspect both healthy fields, both mode=oracle values and PDB=LABPDB. Actual response captured at 11:34:40 UTC13 October:</p>
+<pre><code class="language-json">{
+  &quot;gateway&quot;: &quot;board-gateway-654f76bb55-qdvmb&quot;,
+  &quot;services&quot;: {
+    &quot;tasks&quot;: {
+      &quot;healthy&quot;: true,
+      &quot;ok&quot;: true,
+      &quot;mode&quot;: &quot;oracle&quot;,
+      &quot;pod&quot;: &quot;board-tasks-6cb95b78dd-l42vz&quot;,
+      &quot;instance&quot;: &quot;RACCDB2&quot;,
+      &quot;pdb&quot;: &quot;LABPDB&quot;,
+      &quot;databaseService&quot;: &quot;labpdb_app&quot;,
+      &quot;service&quot;: &quot;python-tasks&quot;
+    },
+    &quot;notes&quot;: {
+      &quot;healthy&quot;: true,
+      &quot;databaseService&quot;: &quot;labpdb_app&quot;,
+      &quot;pdb&quot;: &quot;LABPDB&quot;,
+      &quot;service&quot;: &quot;java-notes&quot;,
+      &quot;mode&quot;: &quot;oracle&quot;,
+      &quot;pod&quot;: &quot;board-notes-558f6cb9fd-wqlq9&quot;,
+      &quot;instance&quot;: &quot;RACCDB1&quot;
+    }
+  },
+  &quot;checkedAt&quot;: &quot;2026-10-13T11:34:40.092Z&quot;
+}
+</code></pre>
+<p><img alt="Rendered actual health response" src="diagrams/health-response.png" /></p>
+<p>Use localhost for the browser. UUID creation relies on its secure-context API available on localhost; raw worker-IP HTTP is not the documented browser entry point. The worker NodePort URLs are useful for command-line diagnostics from ocne-cp.</p>
+<h3 id="10c-routing-table">10c. Routing table</h3>
+<table>
+<thead>
+<tr>
+<th>Browser route</th>
+<th>Frontend forwards to</th>
+<th>Gateway forwards to</th>
+<th>Oracle operation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GET /</td>
+<td>Static local files</td>
+<td>None</td>
+<td>None</td>
+</tr>
+<tr>
+<td>GET /api/status</td>
+<td>board-gateway:8081/api/status</td>
+<td>Both backend /readyz endpoints</td>
+<td>Connection/PDB/table checks</td>
+</tr>
+<tr>
+<td>POST /api/tasks</td>
+<td>board-gateway:8081/api/tasks</td>
+<td>board-tasks:8082/tasks</td>
+<td>Insert/commit LAB_TASKS.BOARD_TASKS</td>
+</tr>
+<tr>
+<td>POST /api/notes</td>
+<td>board-gateway:8081/api/notes</td>
+<td>board-notes:8083/notes</td>
+<td>Insert/commit LAB_NOTES.BOARD_NOTES</td>
+</tr>
+<tr>
+<td>GET /api/tasks or /api/notes</td>
+<td>Corresponding /api route</td>
+<td>/tasks or /notes</td>
+<td>Latest100 records</td>
+</tr>
+<tr>
+<td>GET /api/tasks/UUID or /api/notes/UUID</td>
+<td>Exact-ID route</td>
+<td>Exact-ID route</td>
+<td>That UUID, including records older than100</td>
+</tr>
+</tbody>
+</table>
+<p>Kubernetes DNS resolves short Service names within rac-app. Service ClusterIPs remain stable while a pod is replaced; EndpointSlices change to the new pod IP. No component needs a hard-coded peer pod address.</p>
+<p>Bash on ocne-cp:</p>
+<pre><code class="language-bash">kubectl -n rac-app get services -o wide
+kubectl -n rac-app get endpointslices -o wide
+kubectl -n rac-app get pods -o wide
+</code></pre>
+<p>Actual EndpointSlices after the replacement tests:</p>
+<pre><code class="language-text">NAME                   ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+board-frontend-s8pzp   IPv4          8080    10.244.2.12,10.244.1.17   22m
+board-gateway-7kpgh    IPv4          8081    10.244.1.14,10.244.2.16   22m
+board-notes-5wgwm      IPv4          8083    10.244.1.13,10.244.2.18   22m
+board-tasks-rcd96      IPv4          8082    10.244.1.15,10.244.2.17   22m
+
+</code></pre>
+<h3 id="10d-test-internal-connectivity-without-an-extra-diagnostic-image">10d. Test internal connectivity without an extra diagnostic image</h3>
+<p>The frontend contains Node, so use its fetch implementation. This read-only check runs on ocne-cp:</p>
+<pre><code class="language-bash">kubectl -n rac-app exec deployment/board-frontend -- node -e 'Promise.all([&quot;http://board-gateway:8081/readyz&quot;,&quot;http://board-tasks:8082/readyz&quot;,&quot;http://board-notes:8083/readyz&quot;].map(async u=&gt;{const r=await fetch(u);console.log(u,r.status,await r.text());})).catch(e=&gt;{console.error(e.message);process.exitCode=1;})'
+</code></pre>
+<p>Actual output:</p>
+<pre><code class="language-text">http://board-gateway:8081/readyz 200 {&quot;ok&quot;:true,&quot;pod&quot;:&quot;board-gateway-654f76bb55-qdvmb&quot;}
+http://board-tasks:8082/readyz 200 {&quot;ok&quot;: true, &quot;mode&quot;: &quot;oracle&quot;, &quot;pod&quot;: &quot;board-tasks-6cb95b78dd-l42vz&quot;, &quot;instance&quot;: &quot;RACCDB2&quot;, &quot;pdb&quot;: &quot;LABPDB&quot;, &quot;databaseService&quot;: &quot;labpdb_app&quot;, &quot;service&quot;: &quot;python-tasks&quot;}
+http://board-notes:8083/readyz 200 {&quot;pod&quot;:&quot;board-notes-558f6cb9fd-ccvk6&quot;,&quot;instance&quot;:&quot;RACCDB2&quot;,&quot;databaseService&quot;:&quot;labpdb_app&quot;,&quot;pdb&quot;:&quot;LABPDB&quot;,&quot;service&quot;:&quot;java-notes&quot;,&quot;mode&quot;:&quot;oracle&quot;}
+
+</code></pre>
+<p>This checks Service DNS/routing and real backend SQL readiness. A Service selects one endpoint per connection; inspect individual pod logs/events when diagnosing just one replica.</p>
+<h3 id="10e-what-each-kubernetes-object-does">10e. What each Kubernetes object does</h3>
+<table>
+<thead>
+<tr>
+<th>Object or setting</th>
+<th>Purpose here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Deployment</td>
+<td>Maintains two replicas; creates a replacement when a pod disappears</td>
+</tr>
+<tr>
+<td>Service</td>
+<td>Stable address selecting current Ready pods</td>
+</tr>
+<tr>
+<td>NodePort</td>
+<td>Maps worker port 30080 to frontend Service port 8080</td>
+</tr>
+<tr>
+<td>EndpointSlice</td>
+<td>Current pod addresses behind each Service</td>
+</tr>
+<tr>
+<td>ConfigMap</td>
+<td>Oracle mode, expected PDB, two-listener connect descriptor</td>
+</tr>
+<tr>
+<td>Secret</td>
+<td>Per-backend username/password; browser never receives these</td>
+</tr>
+<tr>
+<td>Backend readiness probe</td>
+<td>Checks Oracle connection, PDB and required table</td>
+</tr>
+<tr>
+<td>Liveness probe</td>
+<td>Checks the process, not Oracle availability</td>
+</tr>
+<tr>
+<td>PDB</td>
+<td>PodDisruptionBudget, minAvailable=1; different meaning from Oracle pluggable database LABPDB</td>
+</tr>
+<tr>
+<td>nodeSelector/spreading</td>
+<td>Limits placement to labelled workers and prefers balanced replicas</td>
+</tr>
+<tr>
+<td>imagePullPolicy Never</td>
+<td>Requires exact staged tags in both workers' CRI-O storage</td>
+</tr>
+</tbody>
+</table>
+<p>There is no app PV/PVC; durable records live in Oracle. Each container's small /tmp is disposable. PDBs govern voluntary eviction, not direct kubectl delete pod or host failure. Rolling updates use maxSurge=0 / maxUnavailable=1 to avoid extra pod reservations in this small lab.</p>
+<p>The recorded post-test kubectl transcript:</p>
+<p><img alt="Rendered actual cluster acceptance transcript" src="diagrams/cluster-acceptance.png" /></p>
+<p>This is a rendering of real captured text, not an invented terminal screen. Full selectable output is in <a href="DEPLOYMENT-RESULTS.md">DEPLOYMENT-RESULTS.md</a>.</p>
+<h3 id="10f-how-database-connections-and-retries-work">10f. How database connections and retries work</h3>
+<p>The ConfigMap's DESCRIPTION contains both racnode1-0-lsnr.rac.svc.cluster.local:31522 and racnode2-0-lsnr.rac.svc.cluster.local:31523, requesting labpdb_app and checking LABPDB. It enables address load balancing/connect-time failover with bounded connect timeouts. The existing SCAN Service selected node1, so the app does not use it as its sole connection endpoint.</p>
+<p>Python and Java maintain small connection pools. A request may reuse a session rather than reconnect. Each reports the instance/PDB from the connection used for its SQL. Both languages observed both RAC instances during real tests; this is not an injected instance-outage test.</p>
+<p><img alt="Write and retry sequence" src="diagrams/write-retry.svg" /></p>
+<ol>
+<li>Browser creates a lowercase UUID and saves UUID/text in localStorage before POST.</li>
+<li>API validates JSON, request size, UUID and UTF-8 text length.</li>
+<li>Parameter-bound SQL inserts the row and commits. HTTP 201 acknowledges a new row.</li>
+<li>A timeout or missing reply leaves the outcome unknown; it does not prove rollback.</li>
+<li>Browser retains the payload and offers <strong>Retry same request</strong>, including after reload.</li>
+<li>The UUID primary key prevents another row. Identical text returns 200/deduplicated=true; changed text returns 409 and preserves the original.</li>
+</ol>
+<p>The live browser test deliberately hid a completed response after a real commit, then reloaded and retried; exactly one note remained. This is application idempotency for these append-only records, not Oracle Application Continuity, Transaction Guard, FAN/FCF or arbitrary transaction replay. Tasks and notes are independent transactions, with no cross-service atomicity.</p>
+<h2 id="11-hands-on-writes-and-application-pod-recovery">11. Hands-on writes and application pod recovery</h2>
+<h3 id="11a-manual-writeretry-test">11a. Manual write/retry test</h3>
+<p>This writes one real task. PowerShell, with the tunnel running:</p>
+<pre><code class="language-powershell">$id = [guid]::NewGuid().ToString()
+$payload = @{id=$id;text='Manual task: verify Oracle persistence'} | ConvertTo-Json -Compress
+Invoke-RestMethod http://127.0.0.1:8080/api/tasks -Method Post -ContentType application/json -Body $payload | ConvertTo-Json -Depth 8
+Invoke-RestMethod http://127.0.0.1:8080/api/tasks -Method Post -ContentType application/json -Body $payload | ConvertTo-Json -Depth 8
+Invoke-RestMethod &quot;http://127.0.0.1:8080/api/tasks/$id&quot; | ConvertTo-Json -Depth 8
+</code></pre>
+<p>Bash equivalent:</p>
+<pre><code class="language-bash">id=$(python3 -c 'import uuid; print(uuid.uuid4())')
+payload=$(python3 -c 'import json,sys; print(json.dumps({&quot;id&quot;:sys.argv[1],&quot;text&quot;:&quot;Manual task: verify Oracle persistence&quot;}))' &quot;$id&quot;)
+curl --fail-with-body -sS http://127.0.0.1:8080/api/tasks -H 'Content-Type: application/json' -d &quot;$payload&quot;
+curl --fail-with-body -sS http://127.0.0.1:8080/api/tasks -H 'Content-Type: application/json' -d &quot;$payload&quot;
+curl --fail-with-body -sS &quot;http://127.0.0.1:8080/api/tasks/$id&quot;
+</code></pre>
+<p>Expected: first deduplicated=false, second=true, same UUID/text, exact-ID GET one item; meta.mode=oracle and meta.pdb=LABPDB. Repeat with /api/notes and a fresh UUID to exercise Java. Reusing a UUID with different text returns 409.</p>
+<p>For the recorded concurrent acceptance, workstation app root:</p>
+<pre><code class="language-powershell">python scripts/verify_live.py --allow-writes
+if ($LASTEXITCODE -ne 0) { throw 'Live acceptance failed' }
+python scripts/provision_access.py verify
+</code></pre>
+<p>Bash uses python3 for both commands. Actual: first POST 201 per language, four concurrent retries all 200/deduplicated, conflicting text 409, exact-ID row count 1. SQL checkpoint after initial acceptance/probes:</p>
+<pre><code class="language-text">KIND   ROWS_TOTAL  UNIQUE_IDS
+tasks         165         165
+notes         164         164
+</code></pre>
+<p>Both accounts were OPEN with CREATE SESSION only; labpdb_app active on both instances. Counts will increase with your tests. The UI deliberately shows only 100 recent records; use exact-ID GET for older accepted rows.</p>
+<h3 id="11b-start-workloads-then-replace-one-pod">11b. Start workloads, then replace one pod</h3>
+<p>Begin with eight Ready app pods and both APIs healthy. Use <strong>two workstation terminals</strong>, one command per terminal, from the app root:</p>
+<pre><code class="language-powershell">python scripts/load_probe.py --kind tasks --seconds 120 --interval 1 --allow-writes --out ../../logs/manual-frontend-tasks-01.jsonl
+</code></pre>
+<pre><code class="language-powershell">python scripts/load_probe.py --kind notes --seconds 120 --interval 1 --allow-writes --out ../../logs/manual-frontend-notes-01.jsonl
+</code></pre>
+<p>Bash uses python3 with the same relative paths. These create real test rows. Use new filenames each time; the probe refuses to overwrite earlier evidence. It retains one unresolved UUID and verifies each exact ID afterward; it does not inject a fault.</p>
+<p>In a third terminal, <strong>Bash on ocne-cp</strong>:</p>
+<pre><code class="language-bash">set -euo pipefail
+kubectl -n rac-app get pods -l app.kubernetes.io/name=board-frontend -o wide
+pod=$(kubectl -n rac-app get pods -l app.kubernetes.io/name=board-frontend -o jsonpath='{.items[0].metadata.name}')
+test -n &quot;$pod&quot;
+kubectl -n rac-app get pod &quot;$pod&quot; -o custom-columns=NAME:.metadata.name,UID:.metadata.uid
+kubectl -n rac-app delete pod &quot;$pod&quot; --wait=true --timeout=120s
+kubectl -n rac-app rollout status deployment/board-frontend --timeout=120s
+kubectl -n rac-app get pods -l app.kubernetes.io/name=board-frontend -o wide
+</code></pre>
+<p>Expected: one pod disappears, a new name/UID appears, two Ready replicas return and Oracle rows remain. The Service/tunnel keeps its stable address. A request in flight can still fail: preserve its UUID and retry identical text if the outcome is unknown.</p>
+<p>Actual frontend output:</p>
+<pre><code class="language-text">pod &quot;board-frontend-6d45679b8c-phfmw&quot; deleted
+Waiting for deployment &quot;board-frontend&quot; rollout to finish: 1 of 2 updated replicas are available...
+deployment &quot;board-frontend&quot; successfully rolled out
+</code></pre>
+<p>New UID a832821f-8db2-4e7f-9e96-0631a6c983c0; delete+rollout3.39 seconds. Each backend created/verified38 records in that20-second sample with zero failures/missing IDs. This is sampled behavior, not a zero-interruption guarantee.</p>
+<p>Repeat independently for gateway, tasks and notes only after healthy recovery, using their exact Deployment/label names and new probe filenames. The explicitly opt-in automated equivalent is:</p>
+<pre><code class="language-powershell">python scripts/exercise_app_pods.py --allow-pod-replacement
+</code></pre>
+<p>Bash: <code>python3 scripts/exercise_app_pods.py --allow-pod-replacement</code>. It replaces one app pod per tier sequentially, runs both probes, records new UIDs, and verifies RAC pod identities/restarts stayed unchanged.</p>
+<h3 id="11c-actual-results-and-limits">11c. Actual results and limits</h3>
+<table>
+<thead>
+<tr>
+<th>Replaced tier</th>
+<th>Tasks created/verified</th>
+<th>Notes created/verified</th>
+<th>Failed attempts / missing IDs</th>
+<th>Delete plus rollout</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Frontend</td>
+<td>38/38</td>
+<td>38/38</td>
+<td>0/0</td>
+<td>3.39s</td>
+</tr>
+<tr>
+<td>Node gateway</td>
+<td>38/38</td>
+<td>38/38</td>
+<td>0/0</td>
+<td>3.05s</td>
+</tr>
+<tr>
+<td>Python tasks</td>
+<td>38/38</td>
+<td>38/38</td>
+<td>0/0</td>
+<td>4.69s</td>
+</tr>
+<tr>
+<td>Java notes</td>
+<td>38/38</td>
+<td>38/38</td>
+<td>0/0</td>
+<td>4.33s</td>
+</tr>
+</tbody>
+</table>
+<p>All ended with eight Ready app pods, zero container restarts and unchanged RAC pod UIDs/restarts. Times measure delete plus rollout completion, not outage duration. <a href="DEPLOYMENT-RESULTS.md">Full actual output</a> includes commands, IDs and probe summaries.</p>
+<p>RAC instance/service outages remain separate future exercises in <a href="FAILOVER.md">FAILOVER.md</a>. RAC pod/container replacement and worker power failure remain deferred due the supplied RAC image's startup defects. App-pod recovery does not prove Oracle-container restart safety. Backup restoration and sustained production performance were not tested.</p>
+<h2 id="12-stop-destroy-and-redeploy">12. Stop, destroy and redeploy</h2>
+<p>This procedure concerns <strong>only the application in rac-app</strong>. The existing Oracle operator, RAC namespace, database instances, service labpdb_app, ASM disks, PVCs, NFS, OCNE nodes and VirtualBox VMs are preserved. App tasks and notes are in LABPDB, not in pod filesystems.</p>
+<p><strong>Execution status:</strong> the removal helper's plan is checked against the live cluster; uninstall and data deletion are documented for your later exercise and have not been executed. Commands marked destructive below are deliberate future actions.</p>
+<h3 id="choose-the-result-you-want">Choose the result you want</h3>
+<table>
+<thead>
+<tr>
+<th>Choice</th>
+<th>Application pods</th>
+<th>Kubernetes configuration</th>
+<th>Oracle records</th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pause</td>
+<td>Scaled to zero</td>
+<td>Retained</td>
+<td>Retained</td>
+<td>Stop the app temporarily</td>
+</tr>
+<tr>
+<td>Uninstall (default)</td>
+<td>Removed</td>
+<td>Exact four Deployments, Services, PDBs and app ConfigMap removed; namespace and two Secrets retained</td>
+<td>Retained</td>
+<td>Practice deploy/destroy without losing records</td>
+</tr>
+<tr>
+<td>Uninstall with Secrets</td>
+<td>Removed</td>
+<td>Same as above plus two app Secrets removed; namespace retained</td>
+<td>Retained</td>
+<td>Remove app access objects; protected master credentials remain on workstation</td>
+</tr>
+<tr>
+<td>Delete app data (separate)</td>
+<td>Must already be removed</td>
+<td>As chosen above</td>
+<td>Both LAB_TASKS/LAB_NOTES schemas and all their records permanently deleted</td>
+<td>Intentionally start with empty app data</td>
+</tr>
+</tbody>
+</table>
+<p>The namespace remains so that unrelated resources someone may later add are not accidentally removed. Do not use <code>kubectl delete -k kubernetes</code>: the kustomization includes the namespace, so that command can remove everything in it. No image pruning or VM deletion is part of app teardown.</p>
+<h3 id="121-inspect-and-capture-before-changing-anything">12.1. Inspect and capture before changing anything</h3>
+<p>From PowerShell:</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab\apps\rac-lab-board
+ssh ocne-cp
+</code></pre>
+<p>From Bash on your workstation, run <code>ssh ocne-cp</code>. The following block is <strong>Bash on ocne-cp</strong>:</p>
+<pre><code class="language-bash">set -euo pipefail
+kubectl config current-context
+kubectl get namespace rac-app --show-labels
+kubectl -n rac-app get deployments,pods,services,pdb,configmaps
+kubectl -n rac-app get secret board-tasks-db board-notes-db
+kubectl -n rac get pods -o wide
+</code></pre>
+<p>Check the context and app ownership label <code>app.kubernetes.io/part-of=rac-lab-board</code>. Do not print Secret YAML. Save wanted tasks/notes or take an appropriate database export before any optional data deletion. Pausing/uninstalling alone does not erase them.</p>
+<h3 id="122-pause-and-resume-alternative-to-uninstall">12.2. Pause and resume (alternative to uninstall)</h3>
+<p>Bash on ocne-cp:</p>
+<pre><code class="language-bash">kubectl -n rac-app scale deployment board-frontend board-gateway board-tasks board-notes --replicas=0
+kubectl -n rac-app wait --for=delete pod -l app.kubernetes.io/part-of=rac-lab-board --timeout=120s
+kubectl -n rac-app get deployments
+</code></pre>
+<p>Expected: desired replicas zero, no app pods, database still running. PDBs do not prevent an explicit Deployment scale-down. Existing requests may be interrupted; retain the same request UUID when resolving an unknown write outcome.</p>
+<p>Resume:</p>
+<pre><code class="language-bash">kubectl -n rac-app scale deployment board-frontend board-gateway board-tasks board-notes --replicas=2
+for name in board-frontend board-gateway board-tasks board-notes; do
+  kubectl -n rac-app rollout status &quot;deployment/$name&quot; --timeout=180s
+done
+</code></pre>
+<p>PowerShell equivalent from the workstation for the scale commands:</p>
+<pre><code class="language-powershell">ssh ocne-cp 'kubectl -n rac-app scale deployment board-frontend board-gateway board-tasks board-notes --replicas=0'
+# Later, resume:
+ssh ocne-cp 'kubectl -n rac-app scale deployment board-frontend board-gateway board-tasks board-notes --replicas=2'
+</code></pre>
+<p>Run only the intended action, not both sequentially as a pause test.</p>
+<h3 id="123-uninstall-the-application-preserving-records">12.3. Uninstall the application, preserving records</h3>
+<p>First copy the reviewed helper from the app root (same commands in PowerShell and Bash):</p>
+<pre><code class="language-text">scp scripts/remove_app.py ocne-cp:rac-app/remove_app.py
+ssh ocne-cp 'python3 ~/rac-app/remove_app.py'
+</code></pre>
+<p>The default is a read-only <strong>plan</strong>. It checks namespace ownership and all 13 named object labels before any deletion. It reports the current kubectl context. It stops if a resource belongs to someone else, and rechecks object UIDs before deleting.</p>
+<p>When you intentionally want to remove the app, run from either workstation shell:</p>
+<pre><code class="language-text">ssh ocne-cp 'python3 ~/rac-app/remove_app.py --execute'
+</code></pre>
+<p>Expected output: deletion of the four Deployments, four Services, four PodDisruptionBudgets and rac-board-config. Dependent ReplicaSets/pods are removed by Kubernetes. The namespace, two Secrets and Oracle data remain. A partial failure is inspected before rerunning; absent named resources are skipped.</p>
+<p>If you also want the two Kubernetes Secrets removed, use this <strong>instead</strong>, or after the default uninstall:</p>
+<pre><code class="language-text">ssh ocne-cp 'python3 ~/rac-app/remove_app.py --execute --remove-secrets'
+</code></pre>
+<p>This does not change Oracle passwords. Keep the matching protected files in D:\OCNE19-Lab\private\rac-app-secrets for redeployment. There is no need to delete those master files or generate new passwords just because pods were removed.</p>
+<p>Inspect afterward, Bash on ocne-cp:</p>
+<pre><code class="language-bash">kubectl -n rac-app get deployments,pods,services,pdb,configmaps
+kubectl -n rac get pods -o wide
+kubectl get nodes
+</code></pre>
+<p>Expected: no named board workloads/Services/PDBs/ConfigMap; RAC still running and nodes Ready. Kubernetes may retain the namespace's automatic kube-root-ca.crt ConfigMap and default ServiceAccount. These are not app workloads. Any unrelated resources are preserved.</p>
+<h3 id="124-redeploy-with-the-existing-records">12.4. Redeploy with the existing records</h3>
+<p><strong>Do not rerun make_secrets.py or create-schemas.</strong> Verify the retained schemas and image tags using <a href="DEPLOYMENT.md">deployment sections 3-4</a>. If you removed Secrets, recreate just the two Secrets from the matching protected files:</p>
+<p>PowerShell, app root:</p>
+<pre><code class="language-powershell">python scripts/provision_access.py verify
+# Only if both app Secrets were removed:
+python scripts/provision_access.py create-secrets
+</code></pre>
+<p>Bash workstation equivalent:</p>
+<pre><code class="language-bash">python3 scripts/provision_access.py verify
+# Only if both app Secrets were removed:
+python3 scripts/provision_access.py create-secrets
+</code></pre>
+<p>If only one Secret is absent, create only that missing Secret using the per-Secret commands in the deployment guide. The helper deliberately does not overwrite existing ones.</p>
+<p>On ocne-cp, after verifying the copied manifests match your intended version:</p>
+<pre><code class="language-bash">kubectl apply --dry-run=server -k &quot;$HOME/rac-app/kubernetes&quot;
+kubectl apply -k &quot;$HOME/rac-app/kubernetes&quot;
+for name in board-frontend board-gateway board-tasks board-notes; do
+  kubectl -n rac-app rollout status &quot;deployment/$name&quot; --timeout=180s
+done
+kubectl -n rac-app get pods -o wide
+</code></pre>
+<p>Reopen the SSH tunnel from <a href="DEPLOYMENT.md">deployment section 7</a>. Existing IDs/text should be readable again. Verify /api/status reports Oracle and LABPDB. GET both collections and use exact-ID GET for older rows beyond the latest 100. Retrying an earlier successful UUID with its identical text returns deduplicated=true and must not create a second row.</p>
+<h3 id="125-optional-permanent-deletion-of-the-application-schemas">12.5. Optional permanent deletion of the application schemas</h3>
+<p><strong>This is data loss, not normal uninstall. It was not executed.</strong> Export any records you want to keep. First uninstall all app pods and stop any direct clients using LAB_TASKS or LAB_NOTES. Review <a href="../database/03-drop-app-schemas.sql">03-drop-app-schemas.sql</a>. It targets only LABPDB, checks for active app sessions, unexpected schema objects and foreign keys from other schemas, and requires the exact confirmation DELETE_RAC_BOARD_DATA. It will not remove the database or PDB.</p>
+<p>From the workstation app root (same PowerShell/Bash commands):</p>
+<pre><code class="language-text">scp database/03-drop-app-schemas.sql ocne-cp:rac-app/database/03-drop-app-schemas.sql
+ssh ocne-cp
+</code></pre>
+<p>Bash on ocne-cp:</p>
+<pre><code class="language-bash">kubectl cp &quot;$HOME/rac-app/database/03-drop-app-schemas.sql&quot; rac/racnode1-0:/tmp/rac-board-drop-schemas.sql
+kubectl exec -it -n rac racnode1-0 -- su - oracle -c 'ORACLE_SID=RACCDB1 /u01/app/oracle/product/19c/dbhome_1/bin/sqlplus -L / as sysdba @/tmp/rac-board-drop-schemas.sql'
+</code></pre>
+<p>Read the prompt. Press Enter to refuse, or type the confirmation only if you intend permanent deletion. Expected successful end: both users dropped and no rows for those usernames. Oracle DDL auto-commits; a partial failure is inspected and completed deliberately. Do not change the PDB name to CDB$ROOT or broaden the usernames.</p>
+<p>To reinstall after this optional deletion, use the original protected credentials with create-schemas, verify zero initial rows, recreate any missing Secrets and apply the manifests. Reusing the existing protected values avoids an accidental mismatch with retained Kubernetes Secrets. If you intentionally rotate credentials, coordinate database and Kubernetes changes before starting pods.</p>
+<h3 id="126-close-the-workstation-tunnel">12.6. Close the workstation tunnel</h3>
+<p>If you ran ssh -N interactively, Ctrl+C closes just that tunnel. The deployed lab may also have a hidden tunnel started by Codex, with its PID recorded in private/rac-app-tunnel.json. Inspect the process before stopping it:</p>
+<pre><code class="language-powershell">$info = Get-Content D:\OCNE19-Lab\private\rac-app-tunnel.json -Raw | ConvertFrom-Json
+Get-CimInstance Win32_Process -Filter &quot;ProcessId = $($info.pid)&quot; | Select-Object ProcessId,Name,CommandLine
+# Only after confirming this is the app's exact ssh -N -L process:
+Stop-Process -Id $info.pid
+</code></pre>
+<p>On a Bash workstation, use <code>ps -p &lt;recorded-pid&gt; -o pid,args</code> and then <code>kill &lt;recorded-pid&gt;</code> after the same check. Never kill every ssh process. Closing the tunnel does not stop cluster pods. A stale PID file is not proof the original process is still running.</p>
+<h3 id="references">References</h3>
+<ul>
+<li><a href="https://kubernetes.io/docs/concepts/workloads/controllers/deployment/">Kubernetes Deployment scaling and rollout</a></li>
+<li><a href="https://kubernetes.io/docs/concepts/workloads/pods/disruptions/">Kubernetes disruption budgets</a></li>
+<li><a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/DROP-USER.html">Oracle DROP USER</a></li>
+</ul></main></body></html>

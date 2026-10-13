@@ -1,4 +1,4 @@
-"""Explicit future container build/export. Does not deploy or stage images on workers."""
+"""Build/export containers with Docker or rootless Podman; does not deploy."""
 
 import argparse, subprocess
 from pathlib import Path
@@ -8,9 +8,12 @@ import hashlib, json
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--tag", default="1.0.0")
+    parser.add_argument("--engine", choices=("docker", "podman"), default="docker")
     parser.add_argument("--archive", type=Path)
     args = parser.parse_args()
-    subprocess.run(["docker", "info"], check=True, stdout=subprocess.DEVNULL)
+    if args.archive and args.archive.exists():
+        raise SystemExit("Refusing to rebuild into an existing image archive; choose a new version")
+    subprocess.run([args.engine, "info"], check=True, stdout=subprocess.DEVNULL)
     service = APP / "backend/java-notes"
     for item in json.loads((service / "dependencies.lock.json").read_text()):
         p = service / "lib" / item["name"]
@@ -32,11 +35,15 @@ if __name__ == "__main__":
         images.append(image)
         subprocess.run(
             [
-                "docker",
+                args.engine,
                 "build",
                 "--platform",
                 "linux/amd64",
-                "--pull",
+                *(
+                    ["--pull=always", "--memory=1024m"]
+                    if args.engine == "podman"
+                    else ["--pull"]
+                ),
                 "-t",
                 image,
                 str(APP / folder),
@@ -47,5 +54,19 @@ if __name__ == "__main__":
         if args.archive.exists():
             raise SystemExit("Refusing to overwrite an existing image archive")
         args.archive.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["docker", "save", "-o", str(args.archive), *images], check=True)
+        subprocess.run(
+            [
+                args.engine,
+                "save",
+                *(
+                    ["--multi-image-archive", "--format=docker-archive"]
+                    if args.engine == "podman"
+                    else []
+                ),
+                "-o",
+                str(args.archive),
+                *images,
+            ],
+            check=True,
+        )
     print("Built " + ", ".join(images) + ". No deployment performed.")

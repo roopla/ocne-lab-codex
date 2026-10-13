@@ -4,7 +4,7 @@ flowchart TB
   ssh["SSH tunnel through ocne-cp<br/>worker NodePort 30080"]
   subgraph cluster["Existing OCNE 1.9 cluster / Kubernetes 1.29"]
     direction TB
-    subgraph app["NEW namespace: rac-app / proposed only"]
+    subgraph app["Application namespace: rac-app / deployed"]
       frontend["Frontend x2<br/>HTML / CSS / JS - port 8080"]
       gateway["Node.js gateway x2<br/>Routes + health - port 8081"]
       python["Python tasks x2 - port 8082<br/>python-oracledb Thin"]

@@ -1,6 +1,6 @@
 # Application and RAC failover exercises
 
-**Future runbook. No application pods are deployed and no cluster faults were injected for this project.** Local test results are in [VALIDATION.md](VALIDATION.md). The database-only tests in the older lab manual do not prove this new application's failover behavior.
+**Live deployment completed on 13 October 2026. F01-F05, F15 and F16 passed against Oracle; other scenarios remain unexecuted or deferred as shown below.** See [actual deployment output](DEPLOYMENT-RESULTS.md) and [historical local tests](VALIDATION.md).
 
 ## 1. Learning objectives and boundaries
 
@@ -62,11 +62,11 @@ Commands below assume Bash on ocne-cp unless stated otherwise. The helper `repla
 
 | ID | Scenario / purpose | Command syntax or section | Expected result / evidence | Actual app-cluster result |
 |---|---|---|---|---|
-| F01 | Healthy baseline | Two probes, no fault | Both backends Oracle mode; all acknowledged IDs verified; establish normal latency | NOT RUN |
-| F02 | Replace one frontend pod | `replace_one board-frontend` | New UID; other frontend serves; tunnel remains connected to Service; backend data unchanged | NOT RUN |
-| F03 | Replace one Node gateway | `replace_one board-gateway` | Other gateway serves; trace shows new gateway; brief in-flight 503 possible | NOT RUN |
-| F04 | Replace one Python pod | `replace_one board-tasks` | Python recovery; Java continues; all task IDs persist in RAC | NOT RUN |
-| F05 | Replace one Java pod | `replace_one board-notes` | Java recovery; Python continues; all note IDs persist | NOT RUN |
+| F01 | Healthy baseline | Two probes, no fault | Both backends Oracle mode; all acknowledged IDs verified; establish normal latency | PASS: 10 creates/10 exact-ID verifies per language; zero failed/missing |
+| F02 | Replace one frontend pod | `replace_one board-frontend` | New UID; other frontend serves; tunnel remains connected to Service; backend data unchanged | PASS: 38 tasks and 38 notes created/verified; zero failed/missing; 3.39s delete+rollout |
+| F03 | Replace one Node gateway | `replace_one board-gateway` | Other gateway serves; trace shows new gateway; brief in-flight 503 possible | PASS: 38 tasks and 38 notes created/verified; zero failed/missing; 3.05s delete+rollout |
+| F04 | Replace one Python pod | `replace_one board-tasks` | Python recovery; Java continues; all task IDs persist in RAC | PASS: 38 tasks and 38 notes created/verified; zero failed/missing; 4.69s delete+rollout |
+| F05 | Replace one Java pod | `replace_one board-notes` | Java recovery; Python continues; all note IDs persist | PASS: 38 tasks and 38 notes created/verified; zero failed/missing; 4.33s delete+rollout |
 | F06 | Restart one gateway container | Section 6 | Same pod UID, restart count increases; separate from pod replacement | NOT RUN |
 | F07 | Rolling update/restart | `kubectl -n rac-app rollout restart deployment/board-gateway` | One replica available during rollout, new pod UIDs; verify workload | NOT RUN |
 | F08 | Entire Python tier unavailable | Scale board-tasks to 0 then back to 2; section 7 | Tasks fail, notes continue, UI reports partial outage; stored task data returns | NOT RUN |
@@ -76,8 +76,8 @@ Commands below assume Bash on ocne-cp unless stated otherwise. The helper `repla
 | F12 | Lose workstation SSH tunnel | Stop only tunnel terminal, then reopen section 10 | Browser/probe network failure while app pods/DB stay healthy; same-ID retry after reconnect | NOT RUN |
 | F13 | Cordon one worker | Section 11 | Existing app/RAC pods remain; proves scheduling control, not worker failover | NOT RUN |
 | F14 | Bad Java image update and rollback | Section 12 | One old Java replica stays available; bad new image fails visibly; rollback restores two | NOT RUN |
-| F15 | Duplicate request/retry after lost reply | API example and browser Retry same request | One committed row for same UUID/text; 200 deduplicated on retry | Local tests PASS; RAC test NOT RUN |
-| F16 | Conflicting UUID payload | Reuse UUID with changed text | HTTP 409, original text unchanged | Local tests PASS; RAC test NOT RUN |
+| F15 | Duplicate request/retry after lost reply | API example and browser Retry same request | One committed row for same UUID/text; 200 deduplicated on retry | PASS on RAC: four concurrent same-ID retries per language; browser hidden reply/reload/retry left one note |
+| F16 | Conflicting UUID payload | Reuse UUID with changed text | HTTP 409, original text unchanged | PASS on RAC: both languages returned 409 and retained original text |
 | F17 | Read-only liveness while DB unavailable | Observe probes during approved DB outage, without causing an extra fault | /livez remains reachable; backend /readyz fails; no false DB health claim | Actual drivers tested against closed localhost port; RAC outage NOT RUN |
 | F18 | Worker power failure | Deferred; no fault command | Requires image startup fix, capacity plan, independent tunnel path and host-local RAC recovery acceptance | DEFERRED |
 | F19 | RAC pod/container replacement | Deferred; see existing recovery evidence | Application can only recover after Oracle itself has recovered | DEFERRED |

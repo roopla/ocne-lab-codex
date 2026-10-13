@@ -1,6 +1,7 @@
 // Optional local UI acceptance. Uses the lab's existing Puppeteer and Edge installation.
 const { createRequire } = require("node:module");
 const path = require("node:path");
+const live = process.argv.includes("--live-oracle");
 const assert = require("node:assert/strict");
 const lab = path.resolve(__dirname, "../../..");
 const puppeteer = createRequire(
@@ -26,7 +27,7 @@ const puppeteer = createRequire(
     );
     assert.match(
       await page.$eval("#mode-banner", (e) => e.textContent),
-      /LOCAL DEMO/,
+      live ? /ORACLE MODE/i : /LOCAL DEMO/,
     );
     await page.type(
       "#tasks-text",
@@ -87,7 +88,9 @@ const puppeteer = createRequire(
     await page.screenshot({
       path: path.join(
         lab,
-        "apps/rac-lab-board/docs/diagrams/application-preview.png",
+        live
+          ? "apps/rac-lab-board/docs/diagrams/application-live.png"
+          : "apps/rac-lab-board/docs/diagrams/application-preview.png",
       ),
       fullPage: true,
     });
@@ -115,7 +118,9 @@ const puppeteer = createRequire(
     );
     assert.deepEqual(errors, []);
     console.log(
-      "PASS: desktop UI, demo banner, create task, lost-response retry across reload, one stored note, mobile width, escaped markup, no browser errors",
+      "PASS: " +
+        (live ? "live Oracle" : "local demo") +
+        " desktop UI, mode banner, create task, lost-response retry across reload, one stored note, mobile width, escaped markup, no browser errors",
     );
   } finally {
     await browser.close();

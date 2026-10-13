@@ -8,7 +8,7 @@ For the existing lab, use [Operating the lab](docs/OPERATING-LAB.md) and [RAC de
 
 Fresh builds use [rac-database.yaml](config/rac-database.yaml). The existing CR retains an immutable legacy service field and uses [rac-database-live.yaml](config/rac-database-live.yaml) for in-place reconciliation; its working application service is labpdb_app. The manual explains this difference and the stale operator connection summary.
 
-For the locally developed frontend and Node.js/Python/Java application, see [RAC Lab Board](apps/rac-lab-board/README.md). Its source, architecture, future deployment manifests and failover workbook are saved separately under apps/rac-lab-board. It has not been deployed or connected to RAC.
+For the deployed frontend and Node.js/Python/Java application, see [RAC Lab Board](apps/rac-lab-board/README.md). Its source, architecture, deployment/destroy walkthroughs and failover workbook are saved separately under apps/rac-lab-board. Eight pods were deployed and verified against LABPDB on 13 October 2026; see the application deployment results for actual tests and remaining scenarios.
 
 ## Architecture at a glance
 

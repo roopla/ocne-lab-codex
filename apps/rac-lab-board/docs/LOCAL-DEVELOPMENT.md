@@ -10,7 +10,7 @@ These steps operate on the workstation only. They do not create database schemas
 - Four free localhost ports: 8080-8083 (demo) or 18080-18083 (automated API tests).
 - Internet for initial dependencies. No Oracle client installation is needed.
 
-Dependencies are pinned in the Python lock file and Java JSON lock. Python lock versions were resolved/tested on Windows/Python 3.10; Linux/Python 3.12 container builds are still an acceptance step. Container base images use readable version tags; after building, record/pin their observed digests before wider use. No claim of a vulnerability scan or immutable base-image lock is made.
+Dependencies are pinned in the Python lock file and Java JSON lock. Python lock versions were resolved/tested on Windows/Python 3.10; Linux/Python 3.12 container builds passed during the 13 October deployment. Container base images use readable version tags; after building, record/pin their observed digests before wider use. No claim of a vulnerability scan or immutable base-image lock is made.
 
 ## 2. Windows PowerShell
 
@@ -66,9 +66,9 @@ node tests/browser.cjs
 
 It checks create, simulated lost write response, preserved UUID after browser reload, deduplication, mobile layout and HTML escaping. It updates the local screenshot in `docs/diagrams/application-preview.png`. The optional test assumes Puppeteer under `private/diagram-tools`; set BROWSER_PATH to a Chromium executable if using another OS.
 
-## 5. Build containers later
+## 5. Build containers
 
-Docker CLI exists on this host, but its Linux engine was stopped. No Docker engine was started and no image was built during this task. Use a Linux-capable build machine or deliberately start the engine later when host memory allows.
+Docker CLI exists on this host, but its Linux engine was stopped. Docker remained stopped; images were subsequently built on the operator with its existing rootless Podman. See DEPLOYMENT.md for that executed path. The Docker commands below are an alternative when a Linux Docker engine is available.
 
 PowerShell, after the engine is available:
 
@@ -89,7 +89,7 @@ python3 scripts/build_images.py --archive ../../private/rac-app-images-1.0.0.tar
 
 The helper builds linux/amd64 images named `localhost/rac-board-frontend:1.0.0`, `localhost/rac-board-gateway:1.0.0`, `localhost/rac-board-tasks:1.0.0` and `localhost/rac-board-notes:1.0.0`. It does not deploy, push or copy them to workers. It refuses to overwrite an existing archive. A changed `--tag` must also be reflected in the four Deployment image fields. `imagePullPolicy: Never` deliberately requires all images staged on both workers; missing images fail visibly instead of pulling an unrelated registry image.
 
-For individual build commands and source orientation, see the README inside each frontend/backend folder. For future staging and deployment, continue to [DEPLOYMENT.md](DEPLOYMENT.md).
+For individual build commands and source orientation, see the README inside each frontend/backend folder. For staging and deployment, continue to [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Optional asset checker dependency
 

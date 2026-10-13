@@ -1,4 +1,4 @@
-"""Opt-in future HTTP workload. Writes records; never injects a fault or contacts Kubernetes."""
+"""Opt-in HTTP workload. Writes records; never injects a fault or contacts Kubernetes."""
 
 import argparse, json, time, uuid, urllib.request, urllib.error, sys
 from datetime import datetime, timezone

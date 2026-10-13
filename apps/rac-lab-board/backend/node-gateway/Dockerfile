@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim
+FROM docker.io/library/node:24-bookworm-slim
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
 COPY --chown=10001:10001 . .

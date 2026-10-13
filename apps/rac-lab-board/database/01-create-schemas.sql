@@ -1,5 +1,5 @@
--- FUTURE MANUAL STEP. Run as SYSDBA inside LABPDB only. Never automatically executed.
--- Supply two different 32-character hexadecimal passwords from protected files.
+-- Explicit provisioning step. Run as SYSDBA inside LABPDB only.
+-- Supply two different 30-character hexadecimal passwords from protected files.
 SET ECHO OFF VERIFY OFF FEEDBACK ON SERVEROUTPUT ON
 WHENEVER SQLERROR EXIT FAILURE ROLLBACK
 ALTER SESSION SET CONTAINER = LABPDB;
@@ -15,14 +15,14 @@ BEGIN
   IF n <> 1 THEN RAISE_APPLICATION_ERROR(-20004,'This lab schema expects AL32UTF8'); END IF;
 END;
 /
-ACCEPT tasks_password CHAR PROMPT 'LAB_TASKS password (32 hex characters; hidden): ' HIDE
-ACCEPT notes_password CHAR PROMPT 'LAB_NOTES password (32 hex characters; hidden): ' HIDE
+ACCEPT tasks_password CHAR PROMPT 'LAB_TASKS password (30 hex characters; hidden): ' HIDE
+ACCEPT notes_password CHAR PROMPT 'LAB_NOTES password (30 hex characters; hidden): ' HIDE
 DECLARE
   t VARCHAR2(128) := '&tasks_password';
   n VARCHAR2(128) := '&notes_password';
 BEGIN
-  IF NOT REGEXP_LIKE(t,'^[0-9a-f]{32}$','c') OR NOT REGEXP_LIKE(n,'^[0-9a-f]{32}$','c') OR t=n THEN
-    RAISE_APPLICATION_ERROR(-20005,'Use different 32-character lowercase hexadecimal passwords');
+  IF NOT REGEXP_LIKE(t,'^[0-9a-f]{30}$','c') OR NOT REGEXP_LIKE(n,'^[0-9a-f]{30}$','c') OR t=n THEN
+    RAISE_APPLICATION_ERROR(-20005,'Use different 30-character lowercase hexadecimal passwords');
   END IF;
   EXECUTE IMMEDIATE 'CREATE USER LAB_TASKS IDENTIFIED BY "' || t || '" DEFAULT TABLESPACE USERS QUOTA 100M ON USERS';
   EXECUTE IMMEDIATE 'CREATE USER LAB_NOTES IDENTIFIED BY "' || n || '" DEFAULT TABLESPACE USERS QUOTA 100M ON USERS';

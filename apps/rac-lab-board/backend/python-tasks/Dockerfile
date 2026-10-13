@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM docker.io/library/python:3.12-slim-bookworm
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app

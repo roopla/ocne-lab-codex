@@ -1,4 +1,4 @@
-"""Future manual step: generate protected application passwords locally. Prints no secrets."""
+"""Explicit manual step: generate protected application passwords locally. Prints no secrets."""
 
 import os, secrets, subprocess
 from pathlib import Path
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     for kind in ("tasks", "notes"):
         for suffix, value in [
             ("username", "LAB_" + kind.upper()),
-            ("password", secrets.token_hex(16)),
+            ("password", secrets.token_hex(15)),
         ]:
             file = target / (kind + "-" + suffix + ".txt")
             with file.open("x", encoding="ascii") as out:

@@ -1,10 +1,12 @@
 # Actual validation and remaining acceptance
 
-**Final local acceptance: 12 October 2026, 23:30:48-23:31:14 UTC.** All temporary app processes were stopped afterward. No application deployment, database schema/user creation, image staging, RAC fault injection or GitHub push was performed.
+**Historical local acceptance: 12 October 2026, 23:30:48-23:31:14 UTC.** All temporary app processes were stopped afterward. No application deployment, database schema/user creation, image staging, RAC fault injection or GitHub push was performed.
 
 Read the [full captured output](TEST-OUTPUT.md), [preview](diagrams/application-preview.png) and [future failover matrix](FAILOVER.md). The suite uses real Node/Python/Java processes, with explicitly temporary memory stores; the separate driver test connects only to a reserved, non-listening loopback port.
 
-## Results table
+Current live deployment, actual Oracle integration, app-pod replacement tests and teardown-plan checks are recorded in [DEPLOYMENT-RESULTS.md](DEPLOYMENT-RESULTS.md). The local-only statements and NOT RUN entries below describe the 12 October development checkpoint, before deployment authorization.
+
+## Historical local results table
 
 | Check / description | Command from app root | Expected result | Actual result |
 |---|---|---|---|

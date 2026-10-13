@@ -20,7 +20,7 @@ Backends expose `/tasks` or `/notes`, without `/api`, plus their own `/livez` an
 
 Supply exactly `id` and `text`. ID must be a lowercase UUID. Text must be nonblank and at most 800 UTF-8 bytes. Maximum HTTP body is 4096 bytes; use `Content-Type: application/json`. Requests with extra fields, malformed JSON or invalid values return 400. Reusing an existing ID with different text returns 409; the original row is preserved. Unrecognized routes return 404, unsupported methods 405, wrong content type 415, and an oversized body 413.
 
-Illustrative Oracle response, **not captured from a deployed app**:
+Illustrative response shape; see [actual Oracle responses](DEPLOYMENT-RESULTS.md) for captured output:
 
 ```json
 {
@@ -53,7 +53,7 @@ On unavailable service/database, expect 503. A write may return:
 
 A 503, timeout or lost network reply does not establish rollback. Retry the **identical** ID/text until you receive a definitive result, then verify with GET by ID. Do not turn an unknown outcome into a new request ID. On recovery, the original committed row returns with `deduplicated: true`; otherwise the retry creates it. A 409 requires inspection rather than an automatic changed-payload retry.
 
-## Copy/paste examples after starting the local demo
+## Copy/paste examples against the deployed app or local demo
 
 PowerShell:
 

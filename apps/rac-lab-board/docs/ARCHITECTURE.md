@@ -10,7 +10,7 @@ The browser is the frontend. A **microservice** is a separately runnable API pro
 
 ## 2. Components
 
-| Component | Code | Responsibility | Port | Future replicas | Database access |
+| Component | Code | Responsibility | Port | Replicas | Database access |
 |---|---|---|---:|---:|---|
 | Frontend | HTML/CSS/browser JS plus Node static server | Two forms, lists, health display; same-origin API proxy | 8080 | 2 | None |
 | Gateway | Node.js 24 built-in HTTP/fetch | Route tasks to Python, notes to Java; aggregate health; request trace | 8081 | 2 | None |
@@ -50,11 +50,11 @@ Observed on 12 October 2026, using read-only cluster inspection:
 | Listener 1 from app pods | racnode1-0-lsnr.rac.svc.cluster.local:31522 |
 | Listener 2 from app pods | racnode2-0-lsnr.rac.svc.cluster.local:31523 |
 | App node selector | raccluster=raccluster01, present on both workers |
-| Proposed frontend NodePort | 30080; unused at inspection, must recheck before deployment |
+| Frontend NodePort | 30080; deployed and verified on both workers on 13 October 2026 |
 
 The Oracle descriptor is in [10-config.yaml](../kubernetes/10-config.yaml). It includes both listener addresses, address load balancing, connect-time failover and bounded connect timeouts. It requests `labpdb_app`; do not replace it with the stale `ORCLPDB` text in the existing CR summary. The existing SCAN listener Service selects node1 only, so it is not used as the sole application connection endpoint.
 
-Ordinary application traffic uses the primary Kubernetes network. App pods do not attach to RAC's Multus private interconnects or access ASM devices. Database traffic stays inside the cluster. For browser access, the proposed path is Windows localhost -> SSH through ocne-cp -> worker NodePort 30080 -> frontend Service -> app pods. SSH tunneling avoids a new load balancer or Ingress controller. It does not make the underlying NodePort private to localhost; retain the lab network's isolation.
+Ordinary application traffic uses the primary Kubernetes network. App pods do not attach to RAC's Multus private interconnects or access ASM devices. Database traffic stays inside the cluster. For browser access, the deployed path is Windows localhost -> SSH through ocne-cp -> worker NodePort 30080 -> frontend Service -> app pods. SSH tunneling avoids a new load balancer or Ingress controller. It does not make the underlying NodePort private to localhost; retain the lab network's isolation.
 
 ## 5. Resource budget and scheduling
 

@@ -1,9 +1,9 @@
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM docker.io/library/eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /app
 COPY lib/ lib/
 COPY src/ src/
 RUN mkdir build && javac --release 21 -cp "lib/*" -d build src/NotesServer.java
-FROM eclipse-temurin:21-jre-jammy
+FROM docker.io/library/eclipse-temurin:21-jre-jammy
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
 COPY --from=build /app/build build/

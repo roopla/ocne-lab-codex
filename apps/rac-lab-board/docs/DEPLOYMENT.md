@@ -1,6 +1,6 @@
-# Future deployment walkthrough - NOT executed
+# Application deployment walkthrough
 
-This chapter changes the live lab when you run it. Development stopped before these steps, as requested. It is a manual procedure, not an auto-run installer. Finish the preflight, schemas and image checks before creating app pods. Use the existing lab; do not rerun VM creation, OS cloning, RAC provisioning or disk formatting.
+This chapter changes the live lab when you run it. The user authorized deployment on 13 October 2026. See [deployment evidence](DEPLOYMENT-RESULTS.md) for actual results and [teardown/redeployment](DESTROY.md) for removal commands. It is a manual procedure, not an auto-run installer. Finish the preflight, schemas and image checks before creating app pods. Use the existing lab; do not rerun VM creation, OS cloning, RAC provisioning or disk formatting.
 
 ## 1. Read-only preflight
 
@@ -49,7 +49,7 @@ Equivalent Bash from the app root:
 python3 scripts/make_secrets.py
 ```
 
-This creates four files in the project's ignored `private/rac-app-secrets`: tasks/notes username and password files. Usernames are LAB_TASKS and LAB_NOTES; passwords are different 32-character random lowercase hexadecimal strings. There are no newline bytes in these files. The helper restricts the directory ACL on Windows or uses mode 0700/0600 on POSIX. It refuses to overwrite an existing directory. It was **not run** during development.
+This creates four files in the project's ignored `private/rac-app-secrets`: tasks/notes username and password files. Usernames are LAB_TASKS and LAB_NOTES; passwords are different 30-character random lowercase hexadecimal strings. There are no newline bytes in these files. The helper restricts the directory ACL on Windows or uses mode 0700/0600 on POSIX. It refuses to overwrite an existing directory. It was run during the authorized deployment. Oracle 19c passwords are limited to 30 bytes; the original 32-character generator failed with ORA-00972 and was corrected before either user existed. See [Oracle password requirements](https://docs.oracle.com/en/database/oracle/oracle-database/19/dbseg/minimum-requirements-passwords.html).
 
 Do not put passwords into YAML, environment-example files, shell history or source control. Reuse these exact passwords at the Oracle prompts and when creating Kubernetes Secrets. Password rotation later requires a coordinated database change, Secret update and controlled app rollout; changing the Secret alone does not change an Oracle password or existing process environment.
 
@@ -84,7 +84,7 @@ Get-Content -Raw D:\OCNE19-Lab\private\rac-app-secrets\notes-password.txt | Set-
 Set-Clipboard -Value ''
 ```
 
-On a Linux graphical workstation, use your protected password manager/file viewer, or `xclip -selection clipboard -i ../../private/rac-app-secrets/tasks-password.txt` from the app root if xclip is installed; repeat for notes, then `printf '' | xclip -selection clipboard`. Password entry is intentionally interactive. Do not paste a password into a shell command. The scripts accept exactly the generated hexadecimal format, avoiding SQL quoting ambiguity.
+On a Linux graphical workstation, use your protected password manager/file viewer, or `xclip -selection clipboard -i ../../private/rac-app-secrets/tasks-password.txt` from the app root if xclip is installed; repeat for notes, then `printf '' | xclip -selection clipboard`. This manual route uses interactive password entry. Do not paste a password into a shell command. The scripts accept exactly the generated hexadecimal format, avoiding SQL quoting ambiguity.
 
 Expected final SQL rows: `LAB_NOTES BOARD_NOTES` and `LAB_TASKS BOARD_TASKS`. Oracle DDL auto-commits; failure halfway through can leave some objects created. Inspect `dba_users`, `dba_tables`, indexes and grants, and execute only missing DDL. Do not blindly rerun the create-users script or drop existing application records.
 
@@ -97,7 +97,75 @@ kubectl exec -i -n rac racnode1-0 -- su - oracle -c 'ORACLE_SID=RACCDB1 /u01/app
 
 Expected: LABPDB, two tables, zero initial records, OPEN user accounts, CREATE SESSION grants and labpdb_app active on both instances. Application writes are verified after deployment, not by inserting dummy administrator-owned data now.
 
+### Noninteractive alternative used for this deployment
+
+The reviewed helper reads the protected files locally, validates the usernames and 30-character hexadecimal passwords, and sends SQL or Secret JSON through encrypted SSH standard input. It does not place passwords in command arguments or print them. SQL errors are redacted before output. It uses the existing authorized ocne-cp SSH alias and OS SYSDBA access inside racnode1-0.
+
+From the Windows app root:
+
+```powershell
+python scripts/provision_access.py create-schemas
+if ($LASTEXITCODE -ne 0) { throw 'Inspect partial schema state before retrying' }
+python scripts/provision_access.py verify
+```
+
+Bash workstation equivalent:
+
+```bash
+python3 scripts/provision_access.py create-schemas
+python3 scripts/provision_access.py verify
+```
+
+Choose either this method or the interactive method above for schema creation, not both. Existing users cause creation to stop deliberately. After section 5 creates the namespace, `python scripts/provision_access.py create-secrets` (Bash: `python3`) creates the two Secrets directly from protected local files without transferring plaintext files to the guest. Choose this helper or section 5's manual Secret commands, not both. A partial Secret creation is inspected and completed individually, never silently overwritten.
+
 ## 4. Build and stage the four container images
+
+### Linux Podman builder used in this lab
+
+Docker Desktop was stopped. The existing operator VM had rootless Podman 5.8.2, SELinux enabled, cgroup v2, about 2.2 GiB available RAM and 82 GiB free root-disk space. We built sequentially there with a 1 GiB build-memory limit. This is our local build implementation, not an OCNE installation requirement. Base images use explicit docker.io/library names to avoid ambiguous short-name registry lookup.
+
+Prepare locked Java jars first using the local-development instructions. Transfer only app build contexts and scripts, including ignored Java lib jars, excluding secrets, node_modules, build output and logs. From the Windows app root:
+
+```powershell
+python scripts/package_build.py
+scp ../../private/rac-app-source-1.0.0.tar.gz ocne-op:rac-app-source-1.0.0.tar.gz
+ssh ocne-op
+```
+
+Bash workstation equivalent:
+
+```bash
+python3 scripts/package_build.py
+scp ../../private/rac-app-source-1.0.0.tar.gz ocne-op:rac-app-source-1.0.0.tar.gz
+ssh ocne-op
+```
+
+On the operator, **first build only** (the directory already exists after this deployment):
+
+```bash
+set -euo pipefail
+podman info
+free -m
+df -h "$HOME"
+test ! -e "$HOME/rac-app-build"
+mkdir "$HOME/rac-app-build"
+tar -xzf "$HOME/rac-app-source-1.0.0.tar.gz" -C "$HOME/rac-app-build"
+python3 "$HOME/rac-app-build/scripts/build_images.py" --engine podman --archive "$HOME/rac-app-images-1.0.0.tar"
+sha256sum "$HOME/rac-app-images-1.0.0.tar"
+```
+
+The helper verifies all locked Java jars, builds linux/amd64 images, and exports a multi-image docker archive. For later code changes, choose a new version tag, directory and archive, update all four manifest tags consistently, and retain the previous version for rollback. Do not overwrite a deployed tag and assume running pods changed. For redeployment of this unchanged version, reuse the verified images/archive.
+
+Because workstation NAT-forwarded transfer was slow, the actual worker transfer used the existing verified inter-VM SSH connections, from the operator:
+
+```bash
+scp -C -o BatchMode=yes -o StrictHostKeyChecking=yes "$HOME/rac-app-images-1.0.0.tar" labadmin@ocne-w1:rac-app-images-1.0.0.tar
+scp -C -o BatchMode=yes -o StrictHostKeyChecking=yes "$HOME/rac-app-images-1.0.0.tar" labadmin@ocne-w2:rac-app-images-1.0.0.tar
+```
+
+Keep a workstation copy under private/ too. Worker import remains **rootful**, as described below. Sources: [Podman build](https://docs.podman.io/en/latest/markdown/podman-build.1.html), [multi-image save](https://docs.podman.io/en/latest/markdown/podman-save.1.html), [load](https://docs.podman.io/en/latest/markdown/podman-load.1.html).
+
+### Docker build alternative and workstation transfer
 
 Follow [local build instructions](LOCAL-DEVELOPMENT.md). After a successful build/export on Windows:
 
@@ -135,9 +203,9 @@ sudo podman load --input "$HOME/rac-app-images-1.0.0.tar"
 sudo crictl images | grep rac-board
 ```
 
-Expected: all four exact `localhost/rac-board-*:1.0.0` tags visible through **crictl on both workers**. A rootless Podman import is not sufficient. If Podman is missing, or CRI-O cannot see those tags, stop and resolve the observed tooling/storage mismatch before applying Deployments. The import commands have not been run as part of this development task. Do not install Docker or alter CRI-O just to bypass the check.
+Expected: all four exact `localhost/rac-board-*:1.0.0` tags visible through **crictl on both workers**. A rootless Podman import is not sufficient. If Podman is missing, or CRI-O cannot see those tags, stop and resolve the observed tooling/storage mismatch before applying Deployments. See the deployment evidence for the actual imports. Do not install Docker or alter CRI-O just to bypass the check.
 
-Record image IDs and build/base-image digests with the future deployment evidence. Dockerfile tags can move; rebuilds are not assumed bit-for-bit identical.
+Record image IDs and build/base-image digests with the deployment evidence. Dockerfile tags can move; rebuilds are not assumed bit-for-bit identical.
 
 ## 5. Create the namespace and the two Secrets
 
@@ -172,6 +240,7 @@ kubectl -n rac-app create secret generic board-tasks-db \
 kubectl -n rac-app create secret generic board-notes-db \
   --from-file=username="$HOME/private/rac-app-secrets/notes-username.txt" \
   --from-file=password="$HOME/private/rac-app-secrets/notes-password.txt"
+kubectl -n rac-app label secret board-tasks-db board-notes-db app.kubernetes.io/part-of=rac-lab-board
 kubectl -n rac-app get secret board-tasks-db board-notes-db
 ```
 
@@ -202,12 +271,12 @@ If rollout fails, use [troubleshooting below](#9-troubleshooting). Never treat a
 From Windows PowerShell or Bash on the workstation, keep this session running:
 
 ```text
-ssh -N -L 8080:192.168.77.12:30080 ocne-cp
+ssh -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -N -L 127.0.0.1:8080:192.168.77.12:30080 ocne-cp
 ```
 
 Use http://localhost:8080. The tunnel goes through the existing SSH alias/NAT forwarding and targets the frontend **Service** via a worker NodePort. A normal frontend pod replacement should not bind the tunnel to the old pod. `kubectl port-forward deployment/...` can be convenient for diagnostics, but its chosen pod connection can end during a pod-replacement test, confounding the result.
 
-For maintenance of worker1, use worker2 as the tunnel destination: `ssh -N -L 8080:192.168.77.13:30080 ocne-cp` after stopping the old tunnel. A tunnel whose fixed destination is powered off will fail independently of app health.
+For maintenance of worker1, use worker2 as the tunnel destination: `ssh -N -L 127.0.0.1:8080:192.168.77.13:30080 ocne-cp` after stopping the old tunnel. A tunnel whose fixed destination is powered off will fail independently of app health.
 
 PowerShell verification:
 
@@ -264,4 +333,4 @@ kubectl -n rac-app logs -l app.kubernetes.io/name=board-notes --prefix --tail=10
 kubectl -n rac-app logs -l app.kubernetes.io/name=board-gateway --prefix --tail=100
 ```
 
-Use `kubectl logs <pod> --previous` for a container restart. Keep raw logs in the project's ignored `logs/`; sanitize evidence before adding it to documentation. No current app deployment, credentials or database changes are implied by these examples.
+Use `kubectl logs <pod> --previous` for a container restart. Keep raw logs in the project's ignored `logs/`; sanitize evidence before adding it to documentation. These commands apply to the deployed application. Read the evidence before treating any fault scenario as executed.
