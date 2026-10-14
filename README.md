@@ -2,6 +2,8 @@
 
 The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, including an ordered power cycle. The subsequent OCNE report completed at 22:10. This documentation was reconciled with those results on 8 October; that is a documentation review date, not a new live health check.
 
+For the shorter fresh-install sequence, use **[fresh-build: OCNE, Database Operator, RAC](fresh-build/README.md)**. Each chapter separates prerequisites/setup and includes commands, expected results and corrective actions.
+
 For a new manual build, start with the **[four-part OCNE-to-RAC manual](docs/OCNE-RAC-END-TO-END-MANUAL.md)** ([printable HTML](docs/OCNE-RAC-END-TO-END-MANUAL.html)). See the **[test scenario matrix: commands, expected versus actual results](docs/RAC-TEST-SCENARIO-MATRIX.md)**. The manual covers OCNE, Database Operator, RAC prerequisites/provisioning, and a [28-scenario operations workbook](docs/RAC-POD-EXERCISES.md) with full captured output and clearly labeled unexecuted exercises.
 
 For the existing lab, use [Operating the lab](docs/OPERATING-LAB.md) and [RAC deployment/acceptance](docs/RAC-DEPLOYMENT.md). RAC completed on 11 October: both instances OPEN, LABPDB READ WRITE, SGA 3 GiB, HugePages disabled, and SQL through both worker listeners verified. Controlled instance/service, cordon, sequential pod replacement and operator-restart exercises are now recorded. Both instances and SQL paths were healthy on 12 October at11:44UTC. Pod2 required assisted GI recovery; pod1 recovered with a duplicate-start image defect still logged. RMAN backup/read validation passed; actual restore and worker/full-lab failure recovery remain untested. **Do not rerun creation, identity resets or formatting.**

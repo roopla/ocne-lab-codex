@@ -130,7 +130,8 @@ def fences(source, label):
 
 def validate():
     documents = [ROOT/"README.md", ROOT/"README-CLONING.md", ROOT/"AGENTS.md",
-                 *sorted((ROOT/"docs").glob("*.md"))]
+                 *sorted((ROOT/"docs").glob("*.md")),
+                 *sorted((ROOT/"fresh-build").glob("*.md"))]
     errors = []
     local_links = 0
     for path in documents:
