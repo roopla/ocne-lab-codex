@@ -27,6 +27,7 @@ GUIDES = [
     ROOT / "docs/OCNE-RAC-END-TO-END-MANUAL.md",
     *sorted((ROOT / "docs").glob("MANUAL-*.md")),
     ROOT / "docs/RAC-POD-EXERCISES.md",
+    ROOT / "docs/RAC-ADD-SHARED-CANDIDATE-DISKS.md",
     ROOT / "docs/RAC-TEST-SCENARIO-MATRIX.md",
     *sorted((ROOT / "docs").glob("RAC-EXERCISE-*-OUTPUT.md")),
 ]

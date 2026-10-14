@@ -42,6 +42,13 @@ spec:
       disks:
         - /dev/disk/by-partlabel/ocne-rac-asm01
         - /dev/disk/by-partlabel/ocne-rac-asm02
+    # Additional shared candidates; no ASM diskgroup is created by OTHERS.
+    - name: SPAREDISKS
+      type: OTHERS
+      autoUpdate: "false"
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm03
+        - /dev/disk/by-partlabel/ocne-rac-asm04
   scanSvcName: racnode-scan
   scanSvcTargetPort: 31521
   serviceDetails:

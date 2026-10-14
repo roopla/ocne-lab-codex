@@ -1,0 +1,13 @@
+flowchart TD
+  D3["Shared VDI asm03 · 50 GiB"] --> W1["ocne-w1 · SATA 6/7"]
+  D3 --> W2["ocne-w2 · SATA 6/7"]
+  D4["Shared VDI asm04 · 50 GiB"] --> W1
+  D4 --> W2
+  W1 --> P1["racnode1-0 · +ASM1"]
+  W2 --> P2["racnode2-0 · +ASM2"]
+  CR["RacDatabase SPAREDISKS<br/>type OTHERS / autoUpdate false"] --> OP["Database Operator"]
+  OP --> PV["Two raw Block PV/PVC pairs"]
+  PV --> P1
+  PV --> P2
+  P1 --> C["asm03 / asm04 available for manual ASM use"]
+  P2 --> C

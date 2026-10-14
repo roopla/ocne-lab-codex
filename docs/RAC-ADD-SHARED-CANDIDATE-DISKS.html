@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Add two shared ASM candidate disks to an existing RAC database</title><style>
+body{margin:0;background:#eef2f6;color:#1d2b3c;font:16px/1.65 system-ui,Segoe UI,sans-serif}
+main{max-width:1060px;margin:28px auto;padding:32px 44px;background:white}
+h1,h2,h3{color:#103c5c;line-height:1.3;break-after:avoid}
+h1{border-bottom:3px solid #16869a;padding-bottom:12px}
+h2{margin-top:2em}a{color:#086783}code{font:0.9em Consolas,monospace;background:#edf2f6;padding:2px 4px}
+pre{background:#152638;color:#ecf4fa;padding:18px;overflow-x:auto;line-height:1.5}
+pre code{padding:0;background:none;color:inherit;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:14px;margin:16px 0}
+th{background:#103c5c;color:white;text-align:left}td,th{padding:9px;border:1px solid #d7e0e7;vertical-align:top}
+img.diagram{max-width:100%;height:auto}details{margin:12px 0}tr:nth-child(even){background:#f5f8fa}.notice{padding:12px;background:#edf5f6}
+.scenario-matrix main{max-width:1600px}.scenario-matrix table:first-of-type{table-layout:fixed}.scenario-matrix td,.scenario-matrix th{overflow-wrap:anywhere}.scenario-matrix table:first-of-type th:nth-child(1){width:4%}.scenario-matrix table:first-of-type th:nth-child(2){width:16%}.scenario-matrix table:first-of-type th:nth-child(3){width:28%}.scenario-matrix table:first-of-type th:nth-child(4){width:20%}.scenario-matrix table:first-of-type th:nth-child(5){width:32%}
+@media(max-width:700px){main{padding:18px;margin:0}table{display:block;overflow-x:auto}}
+@media print{body{background:white;font-size:10pt}main{margin:0;padding:0}
+pre,pre code{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f6;color:black}
+tr{break-inside:avoid}a{color:#163f53}.notice{background:white}}
+</style></head>
+<body><main>
+<!-- Source SHA256: 611e96b6646079d156e25fc25eda4c5efff66bac70db6f04a98af756dbfe89fc; renderer Markdown 3.7 -->
+<p class="notice">Generated from <a href="RAC-ADD-SHARED-CANDIDATE-DISKS.md">the Markdown source</a>. Use <a href="OPERATING-LAB.md">Operating the lab</a> for the completed installation.</p>
+<h1 id="add-two-shared-asm-candidate-disks-to-an-existing-rac-database">Add two shared ASM candidate disks to an existing RAC database</h1>
+<p>Execution date: 14 October 2026. This is a separate maintenance exercise on the existing OCNE/RAC lab. Completed: both shared devices are attached, the YAML is applied, both pods were replaced sequentially, and final ASM/database/application acceptance passed at 23:38 UTC. Do not rerun one-time disk creation or partitioning on this completed hardware.</p>
+<h2 id="1-what-this-exercise-does">1. What this exercise does</h2>
+<p>Add two 50 GiB VirtualBox fixed, shareable disks to <strong>both</strong> workers. Expose their partitions inside both RAC pods using the Database Operator's <code>OTHERS</code> type. Leave them unused so you can later create an ASM diskgroup or add disks yourself.</p>
+<p><code>SPAREDISKS</code> is a configuration placeholder, not an ASM diskgroup. <code>autoUpdate: "false"</code> prevents automatic ASM membership changes; it does not prevent pod replacement. No filesystem, ASM label, diskgroup or database is created on the new partitions by our preparation commands.</p>
+<img class="diagram" src="diagrams/rac-add-shared-candidate-disks-1.svg" alt="RAC-ADD-SHARED-CANDIDATE-DISKS diagram 1"><details><summary>Mermaid diagram source</summary><pre><code class="language-mermaid">flowchart TD
+  D3[&quot;Shared VDI asm03 · 50 GiB&quot;] --&gt; W1[&quot;ocne-w1 · SATA 6/7&quot;]
+  D3 --&gt; W2[&quot;ocne-w2 · SATA 6/7&quot;]
+  D4[&quot;Shared VDI asm04 · 50 GiB&quot;] --&gt; W1
+  D4 --&gt; W2
+  W1 --&gt; P1[&quot;racnode1-0 · +ASM1&quot;]
+  W2 --&gt; P2[&quot;racnode2-0 · +ASM2&quot;]
+  CR[&quot;RacDatabase SPAREDISKS&lt;br/&gt;type OTHERS / autoUpdate false&quot;] --&gt; OP[&quot;Database Operator&quot;]
+  OP --&gt; PV[&quot;Two raw Block PV/PVC pairs&quot;]
+  PV --&gt; P1
+  PV --&gt; P2
+  P1 --&gt; C[&quot;asm03 / asm04 available for manual ASM use&quot;]
+  P2 --&gt; C
+</code></pre></details>
+<p>The PV/PVC objects map existing shared block devices. They do not create the VirtualBox disks. Both workers must see the same underlying media, not independent disks with matching names. VirtualBox <strong>multiattach</strong> uses per-VM differencing images and is unsuitable here; use <strong>shareable</strong> with fixed allocation.</p>
+<h2 id="2-prerequisites-and-execution-locations">2. Prerequisites and execution locations</h2>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Account/tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Windows workstation</td>
+<td>PowerShell, <code>D:\OCNE19-Lab</code>, VBoxManage</td>
+<td>Create/attach media, inspect VM UUIDs, save evidence</td>
+</tr>
+<tr>
+<td><code>ocne-w1</code></td>
+<td>root via SSH, or <code>labadmin</code> with interactive sudo</td>
+<td>Inspect blank disk identities and create GPT partitions once</td>
+</tr>
+<tr>
+<td><code>ocne-w2</code></td>
+<td>root via SSH, or <code>labadmin</code> with interactive sudo</td>
+<td>Refresh partition tables and verify the same partition UUIDs</td>
+</tr>
+<tr>
+<td><code>ocne-cp</code></td>
+<td><code>labadmin</code>, configured kubectl</td>
+<td>Validate/apply YAML, replace one RAC pod at a time, SQL checks</td>
+</tr>
+<tr>
+<td>Inside each RAC pod</td>
+<td><code>grid</code> / <code>oracle</code> through <code>kubectl exec</code></td>
+<td>Verify ASM candidates, GI and database health</td>
+</tr>
+</tbody>
+</table>
+<p>The operator VM <code>ocne-op</code> needs no disk or NFS changes for this exercise. Worker RAM remains 22 GiB each. The existing NFS share is unrelated to ASM storage.</p>
+<p>Before making changes, have the existing RAC deployment healthy and preserve its working manifest. This lab already had node-specific <code>/etc/oracle</code> backups with corrected SELinux labels. The image has a recorded duplicate-CRS-start problem on replacement; see <a href="RAC-POD-EXERCISES.html">pod exercises</a>. Do not assume Kubernetes Ready or the CR's AVAILABLE label proves SQL recovery.</p>
+<h3 id="initial-checks-windows">Initial checks — Windows</h3>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+.\scripts\00-Inspect-Host.ps1
+Get-PSDrive D | Select-Object Name,Free,Used
+$vbox = 'C:\Program Files\Oracle\VirtualBox\VBoxManage.exe'
+&amp; $vbox showvminfo ocne-w1 --machinereadable
+&amp; $vbox showvminfo ocne-w2 --machinereadable
+ssh -F config/windows-ssh.conf ocne-cp
+</code></pre>
+<p>The original inspection helper mixes differently shaped PowerShell objects, so its default table can hide free-space columns. The explicit <code>Get-PSDrive</code> check above avoids that display issue. Actual initial D: free space was <strong>572.8 GiB</strong>, VirtualBox <strong>7.2.18</strong>, both workers running, SATA ports <strong>6 and 7 empty</strong>. Existing ASM disks occupied ports 4 and 5.</p>
+<h3 id="initial-checks-control-plane">Initial checks — control plane</h3>
+<pre><code class="language-bash">kubectl get nodes
+kubectl get pods -n rac -o wide
+kubectl get racdatabase rac19c -n rac
+kubectl get pvc -n rac
+kubectl get pods -n rac-app
+</code></pre>
+<p>Actual: three Ready nodes, two RAC pods Running/Ready, two existing Bound ASM PVCs, eight application pods Running/Ready. SQL verification showed RACCDB1 and RACCDB2 OPEN/ACTIVE, LABPDB READ WRITE on both; DATA mounted with 102392 MiB total, no offline disks or rebalance. SGA remained 3 GiB and HugePages disabled.</p>
+<p><strong>If a check fails:</strong> diagnose existing health first. Do not delete/recreate the CR, database, existing disks, or VMs to resolve a conflict.</p>
+<h2 id="3-create-and-attach-the-shared-disks-windows">3. Create and attach the shared disks — Windows</h2>
+<p>Use <a href="../scripts/Add-RAC-Spare-Disks.ps1">Add-RAC-Spare-Disks.ps1</a>. This is our local VirtualBox implementation, not an Oracle Database Operator requirement. It verifies VM UUIDs, original ASM attachment UUIDs, empty target ports, absent target files and free storage; it verifies original disk attachments again after each new attachment.</p>
+<pre><code class="language-powershell">Set-Location D:\OCNE19-Lab
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile(
+  (Join-Path $PWD 'scripts/Add-RAC-Spare-Disks.ps1'),
+  [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count) { throw ($errors | Out-String) }
+.\scripts\Add-RAC-Spare-Disks.ps1 -SizeGiB 50
+# Only on a fresh run, after reviewing the plan:
+.\scripts\Add-RAC-Spare-Disks.ps1 -SizeGiB 50 -Apply
+</code></pre>
+<p>Expected plan:</p>
+<pre><code class="language-text">PLAN ocne-rac-asm03: 50 GiB fixed/shareable, both workers SATA 6
+PLAN ocne-rac-asm04: 50 GiB fixed/shareable, both workers SATA 7
+</code></pre>
+<p>The script executes <code>VBoxManage createmedium disk --size 51200 --format VDI --variant Fixed</code>, then <code>modifymedium disk ... --type shareable</code>, and <code>storageattach ... --storagectl SATA --port 6/7 --device 0 --type hdd --medium UUID</code> for each worker. Read the linked script for the exact guards and commands; do not run a second creation workflow afterward.</p>
+<p>Actual: both disks hot-attached successfully to the existing Intel AHCI controller while the workers were running. No VM reboot or NIC change was required. No <code>--hotpluggable</code> property was changed on running VMs. If attachment is rejected in another environment, stop and inspect partial creation/attachment state; do not overwrite media or detach an existing DATA disk. Arrange an orderly one-worker-at-a-time shutdown only if that environment requires it.</p>
+<table>
+<thead>
+<tr>
+<th>Disk file under <code>vms/rac-shared/</code></th>
+<th>VirtualBox medium UUID</th>
+<th>Linux serial</th>
+<th style="text-align: right;">Port on both workers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ocne-rac-asm03.vdi</td>
+<td>c4bffe32-3530-4ba2-bb93-9546fcc6efd7</td>
+<td>VBc4bffe32-d7efc6fc</td>
+<td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td>ocne-rac-asm04.vdi</td>
+<td>35658d62-7254-49b9-b8c3-6cd196579d76</td>
+<td>VB35658d62-769d5796</td>
+<td style="text-align: right;">7</td>
+</tr>
+</tbody>
+</table>
+<p>Hardware evidence: local ignored directory <code>logs/asm-spares-20261014-080115/</code>, including before/after attachments, medium information and inventory. Disks stay out of Git.</p>
+<h2 id="4-inspect-and-partition-workers">4. Inspect and partition — workers</h2>
+<h3 id="a-inspect-both-workers-before-writing">a. Inspect BOTH workers before writing</h3>
+<p>Run on each worker:</p>
+<pre><code class="language-bash">hostname
+lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,PARTLABEL,PARTUUID,SERIAL
+ls -l /dev/disk/by-id/
+# Read signatures only after matching the actual serials in lsblk:
+sudo wipefs -n /dev/sdf
+sudo wipefs -n /dev/sdg
+</code></pre>
+<p>The <code>/dev/sdf</code> and <code>/dev/sdg</code> commands above are read-only and use this run's observed names. Substitute your verified devices; the write helper selects by exact <code>lsblk</code> serial, never by these kernel names. Never select only by <code>/dev/sdX</code> or capacity. Actual new disks were <code>/dev/sdf</code> and <code>/dev/sdg</code>, each <strong>53687091200 bytes</strong>, with no partitions, mounts, holders or signatures on either worker. Those kernel names are observations, not portable identifiers.</p>
+<p>Automated evidence used <a href="../scripts/Inspect-RAC-Spare-Disks.sh">Inspect-RAC-Spare-Disks.sh</a>, run with the existing pinned root SSH helper. For manual execution, transfer the helper and use <code>sudo bash</code> on the named worker; no passwordless sudo changes are needed.</p>
+<h3 id="b-create-the-partition-tables-once-on-worker-1-only">b. Create the partition tables ONCE, on worker 1 only</h3>
+<p>Use <a href="../scripts/Prepare-RAC-Spare-Partitions.sh">Prepare-RAC-Spare-Partitions.sh</a>. It has exact observed serial, capacity, machine-ID, empty-signature, mount, holder and absent-label guards. Adapt those inputs from inspection for another environment.</p>
+<p>Windows transfer / manual login:</p>
+<pre><code class="language-powershell">scp -F config/windows-ssh.conf scripts/Prepare-RAC-Spare-Partitions.sh ocne-w1:/home/labadmin/
+ssh -F config/windows-ssh.conf ocne-w1
+</code></pre>
+<p>On <strong>ocne-w1</strong>:</p>
+<pre><code class="language-bash">sed -i 's/\r$//' ~/Prepare-RAC-Spare-Partitions.sh
+bash -n ~/Prepare-RAC-Spare-Partitions.sh
+sudo bash ~/Prepare-RAC-Spare-Partitions.sh
+</code></pre>
+<p>After checking both disks first, the helper runs <code>parted -s -a optimal "$disk" mklabel gpt mkpart "$name" 1MiB 100%</code>, <code>partprobe</code>, and <code>udevadm settle</code>. It does <strong>not</strong> run mkfs or ASM diskgroup SQL.</p>
+<p>Actual result:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th style="text-align: right;">Partition size, bytes</th>
+<th>Partition UUID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ocne-rac-asm03</td>
+<td style="text-align: right;">53684994048</td>
+<td>4ada60ba-ae3c-45b0-9a86-aa656fbb57e6</td>
+</tr>
+<tr>
+<td>ocne-rac-asm04</td>
+<td style="text-align: right;">53684994048</td>
+<td>1bd08689-797c-4d7b-834c-cee370025d39</td>
+</tr>
+</tbody>
+</table>
+<p>The slight size reduction is GPT/alignment space. The operator reports 49Gi after rounding the partition capacity down to whole GiB; that does not mean a 49 GiB virtual disk was created.</p>
+<h3 id="c-refresh-worker-2-do-not-partition-again">c. Refresh worker 2; do NOT partition again</h3>
+<p>On Windows, transfer <a href="../scripts/Refresh-RAC-Spare-Partitions.sh">Refresh-RAC-Spare-Partitions.sh</a>:</p>
+<pre><code class="language-powershell">scp -F config/windows-ssh.conf scripts/Refresh-RAC-Spare-Partitions.sh ocne-w2:/home/labadmin/
+ssh -F config/windows-ssh.conf ocne-w2
+</code></pre>
+<p>Then on worker 2:</p>
+<pre><code class="language-bash"># ocne-w2
+sed -i 's/\r$//' ~/Refresh-RAC-Spare-Partitions.sh
+bash -n ~/Refresh-RAC-Spare-Partitions.sh
+sudo bash ~/Refresh-RAC-Spare-Partitions.sh
+</code></pre>
+<p>This identifies the same two serials, runs <code>partprobe</code> only against them, and verifies both partition UUIDs match worker 1. Actual: both UUIDs matched; both partitions remained blank and unmounted.</p>
+<p><strong>If missing/mismatched:</strong> check the VirtualBox medium UUID attached to both VMs and rescan only the verified new disks. Do not recreate a partition table or create an independent replacement disk.</p>
+<h2 id="5-update-the-existing-rac-manifest-control-plane">5. Update the existing RAC manifest — control plane</h2>
+<p>The executed manifest is <a href="../config/rac-database-live.yaml">config/rac-database-live.yaml</a>. The fresh-build manifest intentionally remains a two-disk starting point. Existing legacy service metadata is immutable, so use the existing-lab file for this maintenance.</p>
+<p>The complete storage section is:</p>
+<pre><code class="language-yaml">spec:
+  asmDiskGroupDetails:
+    - name: DATA
+      redundancy: EXTERNAL
+      type: CRSDG
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm01
+        - /dev/disk/by-partlabel/ocne-rac-asm02
+    - name: SPAREDISKS
+      type: OTHERS
+      autoUpdate: &quot;false&quot;
+      disks:
+        - /dev/disk/by-partlabel/ocne-rac-asm03
+        - /dev/disk/by-partlabel/ocne-rac-asm04
+</code></pre>
+<p>This is a section of the full manifest, not a complete resource to apply by itself. Preserve all existing spec fields and DATA entries. Only one group of type OTHERS is permitted by this operator's webhook. <code>autoUpdate</code> is a string, so retain the quotes.</p>
+<p>Windows:</p>
+<pre><code class="language-powershell">ssh -F config/windows-ssh.conf ocne-cp 'mkdir -p -m 700 ~/asm-spares-20261014'
+scp -F config/windows-ssh.conf config/rac-database-live.yaml ocne-cp:asm-spares-20261014/
+scp -F config/windows-ssh.conf scripts/Preflight-RAC-Spare-Update.sh ocne-cp:asm-spares-20261014/
+ssh -F config/windows-ssh.conf ocne-cp
+</code></pre>
+<p>On <strong>ocne-cp</strong>, before the first apply:</p>
+<pre><code class="language-bash">sed -i 's/\r$//' ~/asm-spares-20261014/Preflight-RAC-Spare-Update.sh
+bash -n ~/asm-spares-20261014/Preflight-RAC-Spare-Update.sh
+bash ~/asm-spares-20261014/Preflight-RAC-Spare-Update.sh
+kubectl diff -f ~/asm-spares-20261014/rac-database-live.yaml
+# diff exit 1 means differences; exit greater than 1 means an error.
+kubectl apply -f ~/asm-spares-20261014/rac-database-live.yaml
+</code></pre>
+<p>The helper saves pre-change non-secret CR, StatefulSet, pod and PVC JSON; verifies the expected CR UID and node-specific GI pointer backups; runs <code>kubectl apply --dry-run=server -o json</code>; compares old/new specs and rejects any unrelated field change. It is a first-apply preflight and intentionally stops once the new group already exists.</p>
+<p>Actual dry-run: <code>Other spec fields changed: []</code>, followed by <code>PASS: server dry-run accepted; only spare disk group entry changes</code>. Apply returned <code>racdatabase.database.oracle.com/rac19c configured</code> at 12:22 UTC. A separate <code>kubectl diff</code> is shown as a manual review aid; the executed helper used the stronger parsed-spec comparison instead.</p>
+<h3 id="observe-operator-discovery-and-raw-block-claims">Observe operator discovery and raw block claims</h3>
+<pre><code class="language-bash">kubectl get pods,ds,pvc -n rac -o wide
+kubectl get pv
+kubectl logs -n oracle-database-operator-system \
+  deployment/oracle-database-operator-controller-manager -c manager --since=5m
+</code></pre>
+<p>Actual operator log at 12:23:34 UTC: detected addition of asm03 and asm04; disk-check DaemonSet created on the workers. At 12:23:44 it created the PV/PVC objects below. They briefly showed Pending and then Bound. Allow reconciliation time; do not create duplicates manually.</p>
+<table>
+<thead>
+<tr>
+<th>Device</th>
+<th>Operator-created PV</th>
+<th>Operator-created PVC</th>
+<th>Expected state/mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>asm03</td>
+<td>asm-pv-9e992939-rac19c</td>
+<td>asm-pvc-9e992939-rac19c</td>
+<td>Bound / Block / RWX / 49Gi</td>
+</tr>
+<tr>
+<td>asm04</td>
+<td>asm-pv-4775bc2f-rac19c</td>
+<td>asm-pvc-4775bc2f-rac19c</td>
+<td>Bound / Block / RWX / 49Gi</td>
+</tr>
+</tbody>
+</table>
+<p>An AVAILABLE CR and updated observedGeneration can precede the completed device update. Inspect actual claims, StatefulSet templates, replacement pod devices and ASM queries.</p>
+<h2 id="6-replace-one-rac-pod-at-a-time">6. Replace one RAC pod at a time</h2>
+<p>Both StatefulSets use <strong>OnDelete</strong> in this lab. The operator updates the pod template, but that strategy requires an explicit pod deletion to adopt the new devices. Do not change the strategy to roll both nodes together. Wait for each template to contain all four <code>volumeDevices</code> before replacing its pod. Inspect on <strong>ocne-cp</strong>:</p>
+<pre><code class="language-bash">for sts in racnode1 racnode2; do
+  echo &quot;$sts&quot;
+  kubectl get sts &quot;$sts&quot; -n rac -o jsonpath='{.spec.updateStrategy.type}{&quot;\n&quot;}{.spec.template.spec.containers[0].volumeDevices}{&quot;\n&quot;}'
+done
+</code></pre>
+<p>Expected: OnDelete and paths asm01 through asm04 on the target template. Initially only node 1 had the updated template; after its replacement the operator updated node 2.</p>
+<p>On Windows, transfer the helper:</p>
+<pre><code class="language-powershell">scp -F config/windows-ssh.conf scripts/Replace-RAC-Pod-For-Spares.sh ocne-cp:asm-spares-20261014/
+</code></pre>
+<p>Use <a href="../scripts/Replace-RAC-Pod-For-Spares.sh">Replace-RAC-Pod-For-Spares.sh</a>, transferred to <code>~/asm-spares-20261014/</code> on the control plane. It checks the peer's CRS and both instances/PDBs with SQL, checks the target's exact template devices and GI backups, records the old UID, and deletes only the named pod with 120-second grace. It waits for a new Ready UID, all four device mappings, CRS health and both SQL instances/PDBs before reporting PASS.</p>
+<pre><code class="language-bash"># ocne-cp
+sed -i 's/\r$//' ~/asm-spares-20261014/Replace-RAC-Pod-For-Spares.sh
+bash -n ~/asm-spares-20261014/Replace-RAC-Pod-For-Spares.sh
+bash ~/asm-spares-20261014/Replace-RAC-Pod-For-Spares.sh 1
+# Continue ONLY after node 1 recovery and the node 2 template has all four devices:
+bash ~/asm-spares-20261014/Replace-RAC-Pod-For-Spares.sh 2
+</code></pre>
+<p>The central Kubernetes operation is <code>kubectl delete pod racnode1-0 -n rac --grace-period=120 --wait=false</code>, followed later by the equivalent for node 2. Do not force-delete a pod or delete the StatefulSet/CR. The script refuses to repeat deletion once the pod already has four devices.</p>
+<p>If recovery fails, keep the peer running and collect <code>crsctl check crs</code>, the startup log at <code>/tmp/orod/oracle_db_setup.log</code>, <code>/etc/oracle</code> and its node-specific persistent backup, and worker SELinux labels. Review <a href="RAC-POD-EXERCISES.html">recorded GI recovery</a> before intervention. Never run GI deinstallation, DBCA or disk formatting to fix a replacement-container startup error.</p>
+<h2 id="7-final-verification">7. Final verification</h2>
+<h3 id="candidate-device-permissions">Candidate device permissions</h3>
+<p>The new OTHERS device nodes initially appeared as <code>root:disk</code> with mode 0666 inside the pods. We set only asm03/04 to <code>grid:asmadmin</code> mode 0660, matching the image's 19c ASM device ownership convention. This changes device-node ownership, not disk contents. Verify/reapply it after a future pod replacement because the container device nodes are recreated.</p>
+<p>Windows transfer:</p>
+<pre><code class="language-powershell">scp -F config/windows-ssh.conf scripts/Set-RAC-Spare-Permissions.sh ocne-cp:asm-spares-20261014/
+</code></pre>
+<p>On <strong>ocne-cp</strong>, after both replacement containers exist:</p>
+<pre><code class="language-bash">sed -i 's/\r$//' ~/asm-spares-20261014/Set-RAC-Spare-Permissions.sh
+bash -n ~/asm-spares-20261014/Set-RAC-Spare-Permissions.sh
+bash ~/asm-spares-20261014/Set-RAC-Spare-Permissions.sh
+</code></pre>
+<p>The <a href="../scripts/Set-RAC-Spare-Permissions.sh">helper</a> verifies each path is a block device of the observed partition size before <code>chown grid:asmadmin</code> and <code>chmod 0660</code>. It acts on only the two new candidate paths in each pod. Actual output was <code>grid:asmadmin 660</code> for all four mappings. SELinux remains Enforcing.</p>
+<h3 id="asm-database-and-application-checks">ASM, database and application checks</h3>
+<p>Quick block-device listing on <strong>ocne-cp</strong>:</p>
+<pre><code class="language-bash">kubectl exec -n rac racnode1-0 -- ls -l /dev/disk/by-partlabel/
+kubectl exec -n rac racnode2-0 -- ls -l /dev/disk/by-partlabel/
+kubectl get pvc -n rac -o wide
+</code></pre>
+<p>Both pods should show asm01, asm02, asm03 and asm04. Listing paths alone does not distinguish ASM membership; use the SQL checks below.</p>
+<p>On Windows:</p>
+<pre><code class="language-powershell">scp -F config/windows-ssh.conf scripts/Verify-RAC-Spare-Candidates.sh scripts/Verify-RAC-Database.sh ocne-cp:asm-spares-20261014/
+</code></pre>
+<p>Run the transferred <a href="../scripts/Verify-RAC-Spare-Candidates.sh">Verify-RAC-Spare-Candidates.sh</a> on <strong>ocne-cp</strong>. It checks both pods and bound raw-block PVs and queries each ASM instance as grid. Then run the existing <a href="../scripts/Verify-RAC-Database.sh">Verify-RAC-Database.sh</a> for GI, database, PDB, RU and memory acceptance.</p>
+<pre><code class="language-bash">sed -i 's/\r$//' ~/asm-spares-20261014/Verify-RAC-Spare-Candidates.sh ~/asm-spares-20261014/Verify-RAC-Database.sh
+bash -n ~/asm-spares-20261014/Verify-RAC-Spare-Candidates.sh
+bash ~/asm-spares-20261014/Verify-RAC-Spare-Candidates.sh
+bash ~/asm-spares-20261014/Verify-RAC-Database.sh
+kubectl get pods -n rac -o wide
+kubectl get pvc -n rac
+</code></pre>
+<p>For manual inspection on <strong>ocne-cp</strong>, open SQL*Plus on ASM1:</p>
+<pre><code class="language-bash">kubectl exec -it -n rac racnode1-0 -- su - grid
+export ORACLE_HOME=/u01/app/19c/grid ORACLE_SID=+ASM1
+/u01/app/19c/grid/bin/sqlplus / as sysasm
+</code></pre>
+<p>Repeat with <code>racnode2-0</code> and <code>+ASM2</code> for the second instance. The ASM query is:</p>
+<pre><code class="language-sql">show parameter asm_diskstring
+select path, header_status, mount_status, mode_status, state,
+       group_number, total_mb
+from v$asm_disk order by path;
+select name, type, state, total_mb, free_mb from v$asm_diskgroup;
+</code></pre>
+<p>Expected on <strong>both +ASM1 and +ASM2</strong>: asm01/02 MEMBER in DATA, asm03/04 CANDIDATE with group_number 0; DATA still 102392 MiB; no SPAREDISKS diskgroup. An unused disk can report total_mb 0 in v$asm_disk before group membership; use block-device size to verify its actual capacity. If candidates are absent, inspect device mappings, grid permissions and ASM discovery string. Do not use FORCE or overwrite headers to make a device appear.</p>
+<h2 id="8-troubleshooting-and-boundaries">8. Troubleshooting and boundaries</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Interpretation / correction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Script says occupied port or existing VDI</td>
+<td>Inspect partial state and medium UUIDs; never overwrite or recreate</td>
+</tr>
+<tr>
+<td>Wrong serial, signatures, child devices or mounts</td>
+<td>Stop before partitioning; select only new disks verified against host inventory</td>
+</tr>
+<tr>
+<td>Worker 2 lacks the new labels</td>
+<td>Run partprobe only on the verified new serials; compare partition UUIDs</td>
+</tr>
+<tr>
+<td>New PVC initially Pending</td>
+<td>Watch binding/events; the operator creates these resources asynchronously</td>
+</tr>
+<tr>
+<td>Template has four devices, old pod has two</td>
+<td>OnDelete requires controlled replacement of that specific pod</td>
+</tr>
+<tr>
+<td>CR AVAILABLE but no candidate devices</td>
+<td>Status alone is insufficient; verify pod spec and ASM SQL</td>
+</tr>
+<tr>
+<td>GI duplicate start / INS-40401</td>
+<td>Inspect CRS and SQL; preserve existing installation and peer; see recorded startup defect</td>
+</tr>
+<tr>
+<td>Permission denied restoring GI backup</td>
+<td>Check old SELinux MCS labels; apply the established worker restorecon policy, retain Enforcing</td>
+</tr>
+<tr>
+<td>Bash heredoc warning after Windows transfer</td>
+<td>Normalize CRLF to LF before bash -n; see actual execution notes below</td>
+</tr>
+<tr>
+<td>ASM rejects RAISE_APPLICATION_ERROR</td>
+<td>ASM is not a full database PL/SQL environment. Use SELECT/CASE count assertions with WHENEVER SQLERROR EXIT; no package installation needed</td>
+</tr>
+</tbody>
+</table>
+<p>The initially written PowerShell helper had a variable-delimiter parse error; it was corrected and parsing/preflight passed <strong>before hardware execution</strong>. An inline SSH JSONPath display command also suffered nested quoting; monitoring was moved to a saved Bash/Python helper. Neither issue changed a live resource.</p>
+<p>No manual CREATE DISKGROUP or ALTER DISKGROUP ADD DISK is part of this exercise. Do not remove these device mappings after allocating the disks to ASM without a separate checked ASM removal procedure. Keeping the CR's eventual diskgroup membership consistent with manual ASM changes is a separate task. Do not blindly apply the fresh two-disk manifest to this expanded live cluster.</p>
+<h2 id="9-sources">9. Sources</h2>
+<ul>
+<li><a href="https://github.com/oracle/oracle-database-operator/blob/ff6f9178c1650df30afbf203ebdb633e9b80760a/docs/rac/provisioning/provisioning_oracle_rac_database_using_diff_dg.md">Oracle Database Operator: different diskgroups / OTHERS placeholder</a>. The local inspected 2.2.0 checkout is pinned at <code>ff6f9178c1650df30afbf203ebdb633e9b80760a</code>.</li>
+<li><a href="https://github.com/oracle/oracle-database-operator/blob/main/docs/rac/provisioning/add_asm_disk_to_an_existing_rac_database.md">Oracle Database Operator: adding ASM disks and autoUpdate behavior</a>.</li>
+<li><a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/storage.html">VirtualBox 7.2 virtual storage: fixed shareable disks</a>.</li>
+<li><a href="https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/vboxmanage.html">VirtualBox 7.2 VBoxManage command reference</a>.</li>
+<li><a href="https://docs.oracle.com/en/operating-systems/oracle-linux/9/stordev/stordev-UsingDiskPartitions.html">Oracle Linux 9: disk partitions</a>.</li>
+<li><a href="https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/V-ASM_DISK.html">Oracle Database 19c V$ASM_DISK</a>.</li>
+</ul>
+<p>The local guard scripts, VirtualBox orchestration, serials, node identities and maintenance sequencing are lab implementation. The OTHERS behavior and operator storage workflow come from the cited Oracle sources.</p>
+<h2 id="10-execution-notes-and-acceptance-evidence">10. Execution notes and acceptance evidence</h2>
+<p>Node 1 was deleted at <strong>12:32:35 UTC</strong>, replaced at approximately <strong>12:34:40 UTC</strong>, and passed CRS plus both-instance/PDB SQL gates at <strong>12:37:52 UTC</strong>. New UID: <code>98728859-0a26-4339-af70-5d5d2ebcd5f7</code>, pod IP <code>10.244.1.24</code>. The existing image again attempted redundant GI installation and logged <code>INS-40401</code>; CRS and SQL recovered without manual GI restoration.</p>
+<p>The first replacement wrapper had one CRLF-terminated heredoc delimiter. Bash warned and Python interpreted the trailing <code>PY</code> as a name <strong>after</strong> the operational checks passed, returning a wrapper error. The helper was corrected to LF, and independent CRS/device/SQL checks established the outcome; we did not repeat node 1 deletion. This was an automation error, not a failed database recovery.</p>
+<p>The first ASM acceptance helper used <code>RAISE_APPLICATION_ERROR</code>, which the ASM instance rejected with <code>PLS-00201</code>. Its SELECT output already showed both candidates. The helper was corrected to read-only SELECT/CASE assertions and rerun successfully before node 2 deletion. A failing assertion now raises divide-by-zero and makes SQL*Plus return failure. No ASM or database packages were installed or changed.</p>
+<p>At <strong>23:32 UTC</strong>, fresh peer/SQL/template checks passed and node 2 replacement started. The gap between node replacements was not a database recovery duration: node 1 had already passed its checks at 12:37 UTC, and node 2 remained running until the later operation.</p>
+<p>Node 2 was deleted at <strong>23:32:23 UTC</strong>, replaced at approximately <strong>23:34:25 UTC</strong>, and passed CRS plus both-instance/PDB SQL checks at <strong>23:37:25 UTC</strong>. New UID: <code>05ce7fd1-3172-4bdd-82f9-faeae76484c9</code>, pod IP <code>10.244.2.28</code>. No manual GI restore was needed. Its startup log still contained CRS-4640/CRS-4000; node 1 also logged INS-40401. This establishes successful recovery in these two runs, not correction of the image's startup logic or proof of worker/full-lab reboot recovery.</p>
+<p>Final verification at <strong>23:37-23:38 UTC</strong> passed on both ASM instances:</p>
+<pre><code class="language-text">PATH                                      HEADER_STATUS  GROUP_NUMBER
+/dev/disk/by-partlabel/ocne-rac-asm01       MEMBER         1
+/dev/disk/by-partlabel/ocne-rac-asm02       MEMBER         1
+/dev/disk/by-partlabel/ocne-rac-asm03       CANDIDATE      0
+/dev/disk/by-partlabel/ocne-rac-asm04       CANDIDATE      0
+
+DISKGROUP  TYPE    STATE    TOTAL_MB
+DATA       EXTERN  MOUNTED  102392
+</code></pre>
+<p>This is a compact transcription of the captured query, not a prediction. Full commands/output, including the failed helper checks and successful reruns, are in <a href="RAC-EXERCISE-SHARED-DISKS-OUTPUT.html">the captured-output appendix</a>. The two new disks remain unused; no new ASM diskgroup was created and DATA was not expanded. Both new device nodes in both pods are grid:asmadmin 0660. Worker memory/vCPUs remain 22 GiB/6 each, and D: had 471.04 GiB free at final inspection.</p>
+<h3 id="scenario-results">Scenario results</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Scenario and execution location</th>
+<th>Command syntax / helper</th>
+<th>Expected</th>
+<th>Actual</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A01</td>
+<td>Host capacity and empty ports; Windows</td>
+<td><code>Get-PSDrive D</code>; <code>VBoxManage showvminfo ocne-w1 --machinereadable</code> and worker 2</td>
+<td>Enough space, correct VMs, ports 6/7 empty</td>
+<td>572.8 GiB initially; both empty; UUIDs verified</td>
+</tr>
+<tr>
+<td>A02</td>
+<td>Fixed shared media; Windows</td>
+<td><code>Add-RAC-Spare-Disks.ps1 -SizeGiB 50 -Apply</code>; <code>VBoxManage showmediuminfo disk FILE</code></td>
+<td>Two fixed/shareable 51200 MiB media</td>
+<td>Passed; same medium UUIDs attached to both running workers</td>
+</tr>
+<tr>
+<td>A03</td>
+<td>Blank-device identity; both workers</td>
+<td><code>lsblk -b -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,SERIAL</code>; <code>wipefs -n DEVICE</code></td>
+<td>Exact new serials, blank disks</td>
+<td>Passed; sdf/sdg observed, no signatures before partitioning</td>
+</tr>
+<tr>
+<td>A04</td>
+<td>Single partitioning writer; worker 1 then worker 2</td>
+<td><code>Prepare-RAC-Spare-Partitions.sh</code>; <code>Refresh-RAC-Spare-Partitions.sh</code></td>
+<td>Identical labels and partition UUIDs</td>
+<td>Passed; both UUID pairs matched, no filesystem</td>
+</tr>
+<tr>
+<td>A05</td>
+<td>Manifest admission and drift; CP</td>
+<td><code>Preflight-RAC-Spare-Update.sh</code></td>
+<td>Only OTHERS entry differs; server accepts</td>
+<td>Passed; unrelated spec changes empty</td>
+</tr>
+<tr>
+<td>A06</td>
+<td>Operator storage discovery; CP</td>
+<td><code>kubectl get pv</code>; <code>kubectl get pvc -n rac</code></td>
+<td>Two additional Bound Block claims</td>
+<td>Passed; 4 total Bound claims, new claims 49Gi/RWX</td>
+</tr>
+<tr>
+<td>A07</td>
+<td>Node 1 replacement; CP</td>
+<td><code>Replace-RAC-Pod-For-Spares.sh 1</code></td>
+<td>New UID, 4 devices, peer retained, both DB/PDB instances open</td>
+<td>Live gates passed 12:37 UTC; wrapper trailing-PY error corrected and independent checks passed</td>
+</tr>
+<tr>
+<td>A08</td>
+<td>Node 2 replacement; CP</td>
+<td><code>Replace-RAC-Pod-For-Spares.sh 2</code></td>
+<td>Same gates, node 1 stays running</td>
+<td>Passed 23:37 UTC, helper exit 0, no manual GI restore</td>
+</tr>
+<tr>
+<td>A09</td>
+<td>Candidate ownership; CP/pods</td>
+<td><code>Set-RAC-Spare-Permissions.sh</code>; <code>stat -c '%U:%G %a' DEVICE</code></td>
+<td>grid:asmadmin 660</td>
+<td>Passed on both paths in both pods</td>
+</tr>
+<tr>
+<td>A10</td>
+<td>ASM discovery/membership; both ASM instances</td>
+<td><code>Verify-RAC-Spare-Candidates.sh</code>; query <code>v$asm_disk</code></td>
+<td>2 new CANDIDATE/group 0 disks and 2 original MEMBER disks</td>
+<td>Passed on +ASM1 and +ASM2</td>
+</tr>
+<tr>
+<td>A11</td>
+<td>Preserve DATA and no placeholder group; ASM</td>
+<td>query <code>v$asm_diskgroup</code></td>
+<td>DATA 102392 MiB; no SPAREDISKS diskgroup</td>
+<td>Passed; no rebalance/offline disks</td>
+</tr>
+<tr>
+<td>A12</td>
+<td>RAC/PDB/patch/memory acceptance; CP</td>
+<td><code>Verify-RAC-Database.sh</code></td>
+<td>2 OPEN/ACTIVE instances, LABPDB READ WRITE, 19.32 RU SUCCESS, SGA 3 GiB, HugePages FALSE</td>
+<td>Passed, service labpdb_app on both instances</td>
+</tr>
+<tr>
+<td>A13</td>
+<td>Application service after replacement; CP</td>
+<td><code>curl --fail http://192.168.77.12:30080/api/status</code> and .13</td>
+<td>Python/Java healthy against Oracle LABPDB</td>
+<td>Passed via both worker paths; final output includes RACCDB1 and RACCDB2</td>
+</tr>
+<tr>
+<td>A14</td>
+<td>Image restart diagnostics; CP</td>
+<td><code>Capture-RAC-Spare-Final.sh</code></td>
+<td>Record errors independently of health</td>
+<td>Both recovered, duplicate-start errors remain; node 1 also INS-40401</td>
+</tr>
+</tbody>
+</table>
+<p>The application was sampled during node 2 recovery and after both instances recovered. This was not a continuous load test and does not establish zero failed requests throughout maintenance. No worker reboot, full-lab restart, CREATE DISKGROUP, ADD DISK, disk removal or ASM rebalance was executed.</p>
+<h3 id="recheck-later-without-changing-anything">Recheck later without changing anything</h3>
+<p>On <strong>ocne-cp</strong>, use the final read-only helpers:</p>
+<pre><code class="language-bash">bash ~/asm-spares-20261014/Verify-RAC-Spare-Candidates.sh
+bash ~/asm-spares-20261014/Verify-RAC-Database.sh
+curl --fail --max-time 25 -sS http://192.168.77.12:30080/api/status
+curl --fail --max-time 25 -sS http://192.168.77.13:30080/api/status
+</code></pre>
+<p>After you intentionally allocate the candidates to ASM, the candidate-only assertion should fail; use a new acceptance query matching your new diskgroup/membership. Do not try to make an allocated disk a candidate again by wiping it.</p>
+</main></body></html>
