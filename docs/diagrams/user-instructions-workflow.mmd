@@ -1,0 +1,44 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "fontSize": "17px", "primaryTextColor": "#17324d", "lineColor": "#64748b", "clusterBkg": "#f8fafc", "clusterBorder": "#cbd5e1"}, "flowchart": {"htmlLabels": true, "curve": "basis", "nodeSpacing": 32, "rankSpacing": 38, "padding": 22, "wrappingWidth": 360}, "look": "classic", "fontFamily": "Segoe UI, Arial, sans-serif", "themeCSS": ".label, .nodeLabel, .cluster-label, .edgeLabel { font-family: Segoe UI, Arial, sans-serif !important; }"}}%%
+flowchart TB
+  START["YOUR INSTRUCTIONS → ONE WORKFLOW<br/>OCNE lab · Database Operator · RAC · Application"]
+  subgraph FOUNDATION["01 / BUILD THE FOUNDATION"]
+    direction LR
+    READ["READ & INSPECT<br/>Project rules + Oracle guides<br/>Windows host, storage, VMs, networks"]
+    CLONE["SELECT & CLONE<br/>Inspect the user-selected golden VM<br/>Preserve source; use cloning workflow"]
+    READY["PREPARE FOUR NODES<br/>Unique identities · hosts entries · SSH keys<br/>op 4/2 · cp 8/4 · workers 22/6 each<br/>RAM GiB / vCPUs"]
+    READ --> CLONE --> READY
+  end
+  subgraph PLATFORM["02 / INSTALL AND VERIFY OCNE"]
+    direction LR
+    OCNE["OCNE 1.9 + KUBERNETES<br/>Follow full Oracle procedure<br/>Oracle Linux 9 / UEK R7"]
+    NFS["ADDITIONAL NFS SHARE<br/>100 GiB on ocne-op<br/>Verify mounted storage + all-node writes"]
+    BASEOK["FOUNDATION CHECKPOINT<br/>Node, service, storage and SSH checks<br/>Finish / correct the OCNE documentation"]
+    OCNE --> NFS --> BASEOK
+  end
+  subgraph DATABASE["03 / PREPARE AND PROVISION RAC"]
+    direction LR
+    OPERATOR["DATABASE OPERATOR<br/>Prepare prerequisites<br/>Install and verify controller"]
+    PREP["RAC READINESS<br/>Shared storage + networking + CVU<br/>Stage slim image and patched 19.32 ZIPs<br/>Review YAML · SGA 3 GiB · HugePages off"]
+    RAC["PROVISION & ACCEPT<br/>Later deployment authorization recorded<br/>Configure GI / ASM / RACCDB / LABPDB<br/>Verify instances, SQL and patch status"]
+    OPERATOR --> PREP --> RAC
+  end
+  subgraph EXPAND["04 / USE, TEST AND EXTEND THE LAB"]
+    direction LR
+    APP["APPLICATION WORKSTREAM<br/>Frontend + Node.js + Python + Java<br/>Develop → review → authorized deployment<br/>Same cluster; RAC backend; test main URL"]
+    TEST["OPERATIONS & FAILOVER<br/>Pod recreation · service / instance exercises<br/>Capture expected vs actual results<br/>Record recovery limits and untested cases"]
+    ASM["SHARED-DISK WORKSTREAM<br/>Two additional devices on both workers<br/>SPAREDISKS · OTHERS · autoUpdate false<br/>Verify ASM candidates; leave unallocated"]
+    APP --> TEST
+    ASM --> TEST
+  end
+  HANDOFF["DOCUMENT & HAND OFF THROUGHOUT<br/>Commands + execution node/user + output + fixes<br/>Manuals · diagrams · scenario table · deploy/destroy guide<br/>Review sanitized files; publish to the authorized GitHub destination"]
+  START --> FOUNDATION --> PLATFORM --> DATABASE --> EXPAND --> HANDOFF
+  classDef foundation fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:2px
+  classDef platform fill:#e0f7f4,stroke:#0d9488,color:#134e4a,stroke-width:2px
+  classDef database fill:#ede9fe,stroke:#7c3aed,color:#4c1d95,stroke-width:2px
+  classDef extension fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:2px
+  classDef bookend fill:#17324d,stroke:#17324d,color:#ffffff,stroke-width:2px
+  class READ,CLONE,READY foundation
+  class OCNE,NFS,BASEOK platform
+  class OPERATOR,PREP,RAC database
+  class APP,TEST,ASM extension
+  class START,HANDOFF bookend

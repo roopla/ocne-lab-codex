@@ -276,3 +276,18 @@ Compared the guide with the existing artifact acceptance and deployment records:
 Added per-machine/user command contexts, expected results, account/path guards, media and archive checks, Windows/Git Bash transfer alternatives, worker staging links, SQL verification, and troubleshooting. The guide explains that prepatching avoids repeated binary patch application but does not remove target GI/ASM/database configuration or SQL patch validation. Linked the folder from the root README and included its Markdown files in the permanent documentation validator.
 
 Validation: 22 Bash blocks and one PowerShell block parsed; the configParams fragment matched both fresh/live YAML manifests; SVG XML parsed. Documentation validation passed 40 Markdown files and 364 local links, fenced-code preservation, anchors, UTF-8, and existing generated HTML consistency. No installers, VM commands, media rebuilding/transfers, Kubernetes changes, or database checks were executed for this documentation task; historical results remain dated. Oracle ZIPs, patch media, credentials, disks, and raw logs remain outside the commit.
+
+
+## 16 October 2026 - Consolidate the user's project instructions
+
+Created docs/USER-INSTRUCTIONS.md from the available conversation and checked-in records at the user's request. Consolidated original cloning/OCNE requirements, access/NFS rules, Operator/RAC preparation and later deployment authorization, user-supplied artifacts, final memory decisions, additional ASM candidates, manual/test requirements, application development/deployment/destroy documentation, and patched-home documentation. Distinguished direct requests, repository rules, implementation choices, superseded holds, and compatibility questions. Linked the brief from README. This is a documentation consolidation only; no host, VM, Kubernetes, database, storage, or application commands were executed. At the end of this preparation step, publication had not yet been requested.
+
+
+## 16 October 2026 - Visual workflow for the consolidated instructions
+
+Added a color-coded four-phase workflow to docs/USER-INSTRUCTIONS.md covering host inspection/cloning, OCNE/NFS acceptance, Operator/RAC preparation and provisioning, and application/shared-disk workstreams with operations testing. Added a separate inspect/validate/execute/verify/document loop with a failure-correction path, plus a table of standing constraints. The workflow distinguishes recorded deployment authorization and does not present all requested exercises as completed. Saved editable Mermaid sources, two SVGs, and a shareable main-workflow PNG under docs/diagrams/.
+
+Rendered and visually inspected the main PNG; corrected initial character encoding, narrow wrapping, and typography before accepting the final diagram. Used the installed renderer's supported --size flag for PNG export. Updated the README description. No lab resources were changed. At the end of diagram preparation, these changes remained local.
+
+
+Publication preparation: the user subsequently requested pushing the consolidated brief and workflow diagrams to the existing GitHub repository. Documentation validation passed 41 Markdown files and 398 local links; whitespace checks passed. Reviewed the documentation and five diagram assets for inclusion, keeping runtime media and private files excluded.

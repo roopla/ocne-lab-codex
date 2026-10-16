@@ -2,6 +2,8 @@
 
 The cloning lab was completed and verified on **1 October 2026 at 22:08 EDT**, including an ordered power cycle. The subsequent OCNE report completed at 22:10. This documentation was reconciled with those results on 8 October; that is a documentation review date, not a new live health check.
 
+For the consolidated project brief, see **[User instructions and decisions](docs/USER-INSTRUCTIONS.md)**: a visual workflow, original requirements, standing constraints, later changes, and links to the detailed work.
+
 For the shorter fresh-install sequence, use **[fresh-build: OCNE, Database Operator, RAC](fresh-build/README.md)**. Each chapter separates prerequisites/setup and includes commands, expected results and corrective actions.
 
 For a new manual build, start with the **[four-part OCNE-to-RAC manual](docs/OCNE-RAC-END-TO-END-MANUAL.md)** ([printable HTML](docs/OCNE-RAC-END-TO-END-MANUAL.html)). See the **[test scenario matrix: commands, expected versus actual results](docs/RAC-TEST-SCENARIO-MATRIX.md)**. The manual covers OCNE, Database Operator, RAC prerequisites/provisioning, and a [28-scenario operations workbook](docs/RAC-POD-EXERCISES.md) with full captured output and clearly labeled unexecuted exercises.

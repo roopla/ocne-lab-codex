@@ -1,0 +1,14 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Segoe UI, Arial, sans-serif", "fontSize": "17px", "lineColor": "#64748b"}, "flowchart": {"curve": "basis", "nodeSpacing": 35, "rankSpacing": 45, "wrappingWidth": 260, "padding": 22}, "look": "classic", "fontFamily": "Segoe UI, Arial, sans-serif", "themeCSS": ".label, .nodeLabel, .cluster-label, .edgeLabel { font-family: Segoe UI, Arial, sans-serif !important; }"}}%%
+flowchart LR
+  A["Inspect current state<br/>Confirm scope + evidence"] --> B["Validate commands<br/>Protect resources + secrets"]
+  B --> C["Execute the authorized step<br/>Use the correct machine / account"]
+  C --> D{"Result verified?"}
+  D -->|"Yes"| E["Record actual outcome<br/>Continue to the next stage"]
+  D -->|"No"| F["Diagnose + document<br/>Correct from observed evidence"]
+  F --> B
+  classDef action fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e,stroke-width:2px
+  classDef success fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:2px
+  classDef gate fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:2px
+  class A,B,C action
+  class E success
+  class D,F gate
