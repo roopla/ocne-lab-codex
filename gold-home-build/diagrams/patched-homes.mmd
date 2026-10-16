@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph BUILD["PREPARE ONCE - separate Oracle Linux 9.8 build VM"]
+    BASE["Oracle 19.3 base ZIPs<br/>Grid + Database"]
+    PRE["19c preinstall RPM<br/>Users, groups and paths"]
+    PATCH["Upgrade OPatch<br/>Apply 19.32 RU via installers<br/>Verify patch inventory"]
+    ZIP["Package software homes<br/>CRC, layout and SHA256 checks"]
+    BASE --> PATCH
+    PRE --> PATCH
+    PATCH --> ZIP
+  end
+  WIN["WINDOWS WORKSTATION<br/>D:/OCNE19-Lab/ISO<br/>Two verified ZIPs - excluded from Git"]
+  W1["ocne-w1<br/>/scratch/software/stage/19c/19.32-gold"]
+  W2["ocne-w2<br/>/scratch/software/stage/19c/19.32-gold"]
+  YAML["RAC configParams<br/>gridSwZipFile + dbSwZipFile<br/>hostSwStageLocation"]
+  RAC["RAC pods on both workers<br/>Extract patched homes<br/>Configure GI, ASM and database"]
+  CHECK["ACCEPTANCE<br/>Both instances and LABPDB open<br/>Binary inventories + SQL patch status"]
+  ZIP --> WIN
+  WIN --> W1
+  WIN --> W2
+  W1 --> RAC
+  W2 --> RAC
+  YAML --> RAC
+  RAC --> CHECK
+  classDef prep fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e
+  classDef artifact fill:#fff7ed,stroke:#ea580c,color:#7c2d12
+  classDef runtime fill:#ecfdf5,stroke:#059669,color:#064e3b
+  class BASE,PRE,PATCH prep
+  class ZIP,WIN,YAML artifact
+  class W1,W2,RAC,CHECK runtime

@@ -8,6 +8,8 @@ For a new manual build, start with the **[four-part OCNE-to-RAC manual](docs/OCN
 
 For the existing lab, use [Operating the lab](docs/OPERATING-LAB.md) and [RAC deployment/acceptance](docs/RAC-DEPLOYMENT.md). RAC completed on 11 October: both instances OPEN, LABPDB READ WRITE, SGA 3 GiB, HugePages disabled, and SQL through both worker listeners verified. Controlled instance/service, cordon, sequential pod replacement and operator-restart exercises are now recorded. Both instances and SQL paths were healthy on 12 October at11:44UTC. Pod2 required assisted GI recovery; pod1 recovered with a duplicate-start image defect still logged. RMAN backup/read validation passed; actual restore and worker/full-lab failure recovery remain untested. **Do not rerun creation, identity resets or formatting.**
 
+For preparing the patched RAC software archives, see **[gold-home-build: Grid and Database 19.32 home ZIPs](gold-home-build/README.md)**. This separate guide records the owner's process, OPatch/RU steps, archive checks, worker staging, and YAML mapping.
+
 For adding unused shared ASM disks after provisioning, see [the separate shared candidate disk exercise](docs/RAC-ADD-SHARED-CANDIDATE-DISKS.md). It records the physical disks, OTHERS manifest update, pod replacement and ASM verification.
 
 Fresh builds use [rac-database.yaml](config/rac-database.yaml). The existing CR retains an immutable legacy service field and uses [rac-database-live.yaml](config/rac-database-live.yaml) for in-place reconciliation; its working application service is labpdb_app. The manual explains this difference and the stale operator connection summary.
