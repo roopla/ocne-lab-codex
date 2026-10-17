@@ -22,6 +22,8 @@ flowchart LR
   R2 --> H2[("Local /scratch: homes")]
 ```
 
+**Reproducing the existing lab exactly:** use the [rebuild contract](../docs/REBUILD-READINESS.md#4-exact-sequence-to-follow-on-a-future-rebuild). This condensed guide is generic; the agreed reconstruction uses cloning, the selected 4/8/22/22 GiB VM allocations, required additional NFS, the application, and the later ASM candidates.
+
 ## Before copying commands
 
 Read a whole numbered step, then execute its blocks in order. Fix a failed expectation before the next step. Blocks are Bash on the named Linux host unless marked workstation; SQL blocks go at SQL>. A block beginning `set -euo pipefail` exits on failure; reconnect if its interactive shell closes. A step marked **root** starts with `sudo -i`; use `exit` to return to labadmin afterward. Supply sudo passwords interactively. Do not enable shell tracing when creating secrets.

@@ -8,6 +8,8 @@ This is a consolidated brief from the user's requests in the available conversat
 
 **How to use it:** give this document to a future collaborator together with [AGENTS.md](../AGENTS.md) and the project README. Preserve the standing constraints, consult the decision history before interpreting an older request, and inspect actual state before acting. User requests, repository rules, and implementation choices are distinguished below.
 
+**Before any wipe/rebuild:** read the [readiness audit and fixed rebuild sequence](REBUILD-READINESS.md). It records verified assets, complete storage/network details, fresh/live YAML handling, and unresolved preservation gates.
+
 ## Workflow at a glance
 
 Read top to bottom: establish the foundation, install OCNE, prepare/provision RAC, then operate the application and storage workstreams. This is a map of the requested work, not a current health/status dashboard or an instruction to rebuild the existing lab. Application work and the additional ASM-disk exercise are separate workstreams after RAC readiness.
@@ -267,7 +269,7 @@ Likewise, requests to cover all failover scenarios establish documentation/testi
 
 1. Read this brief, AGENTS.md, README, current configuration, and relevant stage/run logs.
 2. Identify the active user request and current observed state; do not restart completed provisioning.
-3. Preserve the golden VM, unrelated resources, current worker allocations, selected RAC memory settings, and existing data.
+3. Preserve the golden VM, unrelated resources, current worker allocations and selected RAC memory settings. The owner subsequently waived database/application data preservation for a future fresh rebuild; this does not authorize deletion during backup preparation.
 4. Use the correct fresh/live manifests and the recorded supplied-artifact workflow.
 5. Follow documented identity/storage/security checks before any affected operation.
 6. Continue within the authorized scope; obtain missing facts or required interactive access without repeatedly asking about already-approved routine work.
@@ -275,3 +277,7 @@ Likewise, requests to cover all failover scenarios establish documentation/testi
 8. Review any files intended for GitHub; keep media and secrets private.
 
 This compilation is an index of intent and decisions. It does not replace the manuals, modify live configuration, or authorize new destructive work.
+
+## 13. Rebuild preservation decisions
+
+The owner approved `E:\OCNE19-Rebuild-Backup` for reconstruction assets, does not need current application/database data, and explicitly prohibits destroying the golden VM. Prepare and verify the kit before a separately authorized destructive phase. Follow the existing exact rebuild sequence; create fresh schemas instead of restoring current data. See [backup preparation and receipt](REBUILD-BACKUP.md).
